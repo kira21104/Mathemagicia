@@ -6,38 +6,93 @@ const { useState: _uS_q, useEffect: _uE_q, useRef: _uR_q, useMemo: _uM_q } = Rea
 // MAGIC SQUARE  —  Drag numbered tiles into a 3×3 grid.
 // Rows/columns/diagonals must sum to 15. Some cells are seeded.
 // ─────────────────────────────────────────────────────────────
-function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA' }) {
-  // 3x3 magic square solution (1..9):
-  //  2 7 6
-  //  9 5 1
-  //  4 3 8
-  const SOLUTION = [[2,7,6],[9,5,1],[4,3,8]];
-  // Pre-seeded cells (locked)
-  const SEED = [[null,null,6],[null,5,null],[4,null,null]];
 
-  // Tray contains the remaining numbers, shuffled.
+// Все 8 трансформаций базовой раскладки (повороты + отражения)
+function msTransforms(base) {
+  const rot90 = g => [
+    [g[2][0], g[1][0], g[0][0]],
+    [g[2][1], g[1][1], g[0][1]],
+    [g[2][2], g[1][2], g[0][2]],
+  ];
+  const flip = g => g.map(row => [...row].reverse());
+  const t0 = base;
+  const t1 = rot90(t0);
+  const t2 = rot90(t1);
+  const t3 = rot90(t2);
+  return [t0, t1, t2, t3, flip(t0), flip(t1), flip(t2), flip(t3)];
+}
+
+// Сколько ячеек остаётся открытыми (не запечатанными) по уровню
+function msOpenCount(levelIdx) {
+  if (levelIdx <= 3)  return 3; // 6 seeded, 3 open
+  if (levelIdx <= 6)  return 4; // 5 seeded, 4 open
+  if (levelIdx <= 10) return 5; // 4 seeded, 5 open
+  if (levelIdx <= 15) return 6; // 3 seeded, 6 open
+  return 7;                     // 2 seeded, 7 open
+}
+
+// xorshift для детерминированного перемешивания по номеру уровня
+function xr(seed) {
+  let s = seed | 1;
+  return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
+}
+
+function msGenLevel(levelIdx) {
+  const rng = xr(levelIdx * 1013 + 7);
+  const BASE = [[2,7,6],[9,5,1],[4,3,8]];
+  const variants = msTransforms(BASE);
+  const variantIdx = Math.floor(rng() * 8);
+  const solution = variants[variantIdx];
+
+  const openCount = msOpenCount(levelIdx);
+  // Все позиции кроме центра (1,1) — центр всегда 5, лучше оставить как подсказку на низких уровнях
+  const positions = [[0,0],[0,1],[0,2],[1,0],[1,2],[2,0],[2,1],[2,2]];
+  // Перемешиваем позиции через rng
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+  // Открытые позиции — первые openCount из перемешанного списка
+  const openSet = new Set(positions.slice(0, openCount).map(([r,c]) => `${r},${c}`));
+
+  // SEED: null для открытых ячеек, значение для закрытых
+  const seed = solution.map((row, r) => row.map((v, c) => openSet.has(`${r},${c}`) ? null : v));
+
+  // Перемешиваем числа в лотке
   const remaining = [];
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (SEED[r][c] == null) remaining.push(SOLUTION[r][c]);
-  const SHUFFLED = [...remaining].sort((a, b) => ((a * 7) % 13) - ((b * 11) % 13));
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) if (seed[r][c] == null) remaining.push(solution[r][c]);
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+
+  return { solution, seed, remaining };
+}
+
+function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
+  const { solution: SOLUTION, seed: SEED, remaining: SHUFFLED } = _uM_q(
+    () => msGenLevel(levelIdx), [levelIdx]
+  );
 
   // SVG layout in 360 × 520
   const CELL = 70, GRID_X = 75, GRID_Y = 70;
-  const cellRect = (r, c) => ({ x: GRID_X + c * CELL, y: GRID_Y + r * CELL });
   const cellCenter = (r, c) => ({ x: GRID_X + c * CELL + CELL / 2, y: GRID_Y + r * CELL + CELL / 2 });
 
-  const trayY = 410, trayStartX = 60, traySpacing = 50;
+  const trayY = 410, traySpacing = 50;
   const TILE_R = 22;
+  // Центрируем лоток по количеству фишек
+  const trayStartX = 180 - ((SHUFFLED.length - 1) * traySpacing) / 2;
 
   // Pieces (only the missing-from-seed numbers)
   const initialPieces = SHUFFLED.map((n, i) => ({
     id: `p${i}`, value: n,
     x: trayStartX + i * traySpacing, y: trayY,
     home: { x: trayStartX + i * traySpacing, y: trayY },
-    placed: null, // { r, c }
+    placed: null,
   }));
 
   const [pieces, setPieces] = _uS_q(initialPieces);
-  const [drag, setDrag] = _uS_q(null); // {id, dx, dy}
+  const [drag, setDrag] = _uS_q(null);
   const [pointer, setPointer] = _uS_q(null);
   const [solved, setSolved] = _uS_q(false);
   const [error, setError] = _uS_q(null);
