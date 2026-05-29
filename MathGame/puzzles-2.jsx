@@ -92,11 +92,16 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   }));
 
   const [pieces, setPieces] = _uS_q(initialPieces);
-  const [drag, setDrag] = _uS_q(null);
-  const [pointer, setPointer] = _uS_q(null);
+  const [dragId, setDragId] = _uS_q(null);
   const [solved, setSolved] = _uS_q(false);
   const [error, setError] = _uS_q(null);
   const svgRef = _uR_q(null);
+  // Ref для drag-состояния — читается в нативных обработчиках без stale closure
+  const dragRef = _uR_q(null); // { id, dx, dy }
+  const piecesRef = _uR_q(initialPieces);
+
+  // Синхронизируем piecesRef с pieces state
+  _uE_q(() => { piecesRef.current = pieces; }, [pieces]);
 
   // Compute grid values from placed pieces + seeds
   const gridValues = (() => {
@@ -123,63 +128,103 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     }
   }, [pieces]);
 
-  const ptr = (e) => {
+  const svgPt = (clientX, clientY) => {
     const rect = svgRef.current.getBoundingClientRect();
-    const touch = e.changedTouches ? e.changedTouches[0] : (e.touches ? e.touches[0] : null);
-    const cx = touch ? touch.clientX : e.clientX;
-    const cy = touch ? touch.clientY : e.clientY;
     return {
-      x: (cx - rect.left) * (360 / rect.width),
-      y: (cy - rect.top)  * (520 / rect.height),
+      x: (clientX - rect.left) * (360 / rect.width),
+      y: (clientY - rect.top)  * (520 / rect.height),
     };
   };
 
-  const startDrag = (piece) => (e) => {
-    e.preventDefault();
-    if (solved) return;
-    const p = ptr(e);
-    const dx = p.x - piece.x;
-    const dy = p.y - piece.y;
-    setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placed: null } : pc));
-    setDrag({ id: piece.id, dx, dy });
-    setPointer(p);
+  const getClient = (e) => {
+    if (e.changedTouches && e.changedTouches.length) return { cx: e.changedTouches[0].clientX, cy: e.changedTouches[0].clientY };
+    if (e.touches && e.touches.length) return { cx: e.touches[0].clientX, cy: e.touches[0].clientY };
+    return { cx: e.clientX, cy: e.clientY };
   };
 
-  const onMove = (e) => {
-    if (!drag) return;
-    const p = ptr(e);
-    setPointer(p);
-    setPieces(ps => ps.map(pc => pc.id === drag.id ? { ...pc, x: p.x - drag.dx, y: p.y - drag.dy } : pc));
-  };
+  // Нативные обработчики на SVG через useEffect — чтобы передать passive:false
+  _uE_q(() => {
+    const el = svgRef.current;
+    if (!el) return;
 
-  const onUp = () => {
-    if (!drag) return;
-    const piece = pieces.find(pc => pc.id === drag.id);
-    // Determine nearest empty cell within snap radius
+    const onTouchMove = (e) => {
+      e.preventDefault();
+      if (!dragRef.current) return;
+      const { cx, cy } = getClient(e);
+      const p = svgPt(cx, cy);
+      const { id, dx, dy } = dragRef.current;
+      setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
+    };
+
+    const onTouchEnd = (e) => {
+      if (!dragRef.current) return;
+      const { cx, cy } = getClient(e);
+      const p = svgPt(cx, cy);
+      finishDrag(p.x, p.y);
+    };
+
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: false });
+    return () => {
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [SEED, SOLUTION]); // только при смене уровня
+
+  const finishDrag = (px, py) => {
+    const dr = dragRef.current;
+    if (!dr) return;
+    const ps = piecesRef.current;
+    const piece = ps.find(pc => pc.id === dr.id);
+    if (!piece) { dragRef.current = null; setDragId(null); return; }
+
     let target = null, best = Infinity;
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
       if (SEED[r][c] != null) continue;
-      // Skip if another piece is already in this cell
-      if (pieces.some(p => p.id !== piece.id && p.placed && p.placed.r === r && p.placed.c === c)) continue;
+      if (ps.some(p => p.id !== piece.id && p.placed && p.placed.r === r && p.placed.c === c)) continue;
       const ctr = cellCenter(r, c);
-      const d = Math.hypot(ctr.x - piece.x, ctr.y - piece.y);
-      if (d < best && d < 52) { best = d; target = { r, c }; }
+      const d = Math.hypot(ctr.x - px, ctr.y - py);
+      if (d < best && d < 55) { best = d; target = { r, c }; }
     }
+
+    dragRef.current = null;
+    setDragId(null);
+
     if (target) {
       const ctr = cellCenter(target.r, target.c);
-      // Soft check — if cell expects a different number, allow but flash if wrong
       const correct = SOLUTION[target.r][target.c] === piece.value;
-      setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
+      setPieces(ps2 => ps2.map(pc => pc.id === piece.id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
       if (!correct) {
         setError({ r: target.r, c: target.c });
         setTimeout(() => setError(null), 700);
       }
     } else {
-      // spring back home
-      setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
+      setPieces(ps2 => ps2.map(pc => pc.id === piece.id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
     }
-    setDrag(null);
-    setPointer(null);
+  };
+
+  const startDrag = (piece) => (e) => {
+    e.preventDefault();
+    if (solved) return;
+    const { cx, cy } = getClient(e);
+    const p = svgPt(cx, cy);
+    const dr = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
+    dragRef.current = dr;
+    setDragId(piece.id);
+    setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placed: null } : pc));
+  };
+
+  const onMouseMove = (e) => {
+    if (!dragRef.current) return;
+    const p = svgPt(e.clientX, e.clientY);
+    const { id, dx, dy } = dragRef.current;
+    setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
+  };
+
+  const onMouseUp = (e) => {
+    if (!dragRef.current) return;
+    const p = svgPt(e.clientX, e.clientY);
+    finishDrag(p.x, p.y);
   };
 
   // Tile renderer
@@ -222,8 +267,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     <div style={{ position:'relative', width:'100%', height:'100%' }}>
       <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%"
         style={{ touchAction:'none', display:'block' }}
-        onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-        onTouchMove={onMove} onTouchEnd={onUp}>
+        onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
         {/* Chapter mark */}
         <text x="180" y="40" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
           fontSize="13" fill="#D4AF37" letterSpacing="4">II · QUADRATUM</text>
@@ -287,7 +331,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
 
         {/* Draggable pieces */}
         {pieces.map(p => {
-          const isDrag = drag && drag.id === p.id;
+          const isDrag = dragId === p.id;
           const isErr = error && p.placed && error.r === p.placed.r && error.c === p.placed.c;
           return (
             <g key={p.id} onMouseDown={startDrag(p)} onTouchStart={startDrag(p)}
