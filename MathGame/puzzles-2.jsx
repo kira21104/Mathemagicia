@@ -96,12 +96,8 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   const [solved, setSolved] = _uS_q(false);
   const [error, setError] = _uS_q(null);
   const svgRef = _uR_q(null);
-  // Ref для drag-состояния — читается в нативных обработчиках без stale closure
-  const dragRef = _uR_q(null); // { id, dx, dy }
-  const piecesRef = _uR_q(initialPieces);
-
-  // Синхронизируем piecesRef с pieces state
-  _uE_q(() => { piecesRef.current = pieces; }, [pieces]);
+  const dragRef = _uR_q(null);   // { id, dx, dy } — читается в document-обработчиках
+  const stateRef = _uR_q({ pieces: initialPieces, seed: SEED, solution: SOLUTION, cellCenter, solved: false });
 
   // Compute grid values from placed pieces + seeds
   const gridValues = (() => {
@@ -116,6 +112,9 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     ? gridValues[0][0] + gridValues[1][1] + gridValues[2][2]
     : gridValues[0][2] + gridValues[1][1] + gridValues[2][0];
   const cellFilled = (r, c) => gridValues[r][c] != null;
+
+  // Всегда актуальный snapshot для document-обработчиков
+  stateRef.current = { pieces, seed: SEED, solution: SOLUTION, cellCenter, solved };
 
   // Win check
   _uE_q(() => {
@@ -136,80 +135,84 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     };
   };
 
-  const getClient = (e) => {
-    if (e.changedTouches && e.changedTouches.length) return { cx: e.changedTouches[0].clientX, cy: e.changedTouches[0].clientY };
-    if (e.touches && e.touches.length) return { cx: e.touches[0].clientX, cy: e.touches[0].clientY };
-    return { cx: e.clientX, cy: e.clientY };
-  };
-
-  // Нативные обработчики на SVG через useEffect — чтобы передать passive:false
+  // Все touch-обработчики вешаем на document с passive:false —
+  // JSX onTouchStart пассивен в современных браузерах, preventDefault там игнорируется,
+  // браузер начинает scroll-жест и перехватывает touchmove даже у наших passive:false листенеров.
   _uE_q(() => {
-    const el = svgRef.current;
-    if (!el) return;
+    const onStart = (e) => {
+      if (stateRef.current.solved) return;
+      const t = e.touches[0];
+      const p = svgPt(t.clientX, t.clientY);
+      const { pieces: ps } = stateRef.current;
+      // Ищем фишку под пальцем (по SVG-координатам)
+      let hit = null;
+      for (let i = ps.length - 1; i >= 0; i--) {
+        const pc = ps[i];
+        if (Math.hypot(pc.x - p.x, pc.y - p.y) < 30) { hit = pc; break; }
+      }
+      if (!hit) return;
+      e.preventDefault(); // теперь можем — мы в passive:false листенере
+      dragRef.current = { id: hit.id, dx: p.x - hit.x, dy: p.y - hit.y };
+      setDragId(hit.id);
+      setPieces(ps2 => ps2.map(pc => pc.id === hit.id ? { ...pc, placed: null } : pc));
+    };
 
-    const onTouchMove = (e) => {
-      e.preventDefault();
+    const onMove = (e) => {
       if (!dragRef.current) return;
-      const { cx, cy } = getClient(e);
-      const p = svgPt(cx, cy);
+      e.preventDefault();
+      const t = e.touches[0];
+      const p = svgPt(t.clientX, t.clientY);
       const { id, dx, dy } = dragRef.current;
       setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
     };
 
-    const onTouchEnd = (e) => {
+    const onEnd = (e) => {
       if (!dragRef.current) return;
-      const { cx, cy } = getClient(e);
-      const p = svgPt(cx, cy);
-      finishDrag(p.x, p.y);
-    };
+      const t = e.changedTouches[0];
+      const p = svgPt(t.clientX, t.clientY);
+      const { id } = dragRef.current;
+      const { pieces: ps, seed, solution, cellCenter: cc } = stateRef.current;
+      const piece = ps.find(pc => pc.id === id);
+      dragRef.current = null;
+      setDragId(null);
+      if (!piece) return;
 
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd, { passive: false });
-    return () => {
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [SEED, SOLUTION]); // только при смене уровня
-
-  const finishDrag = (px, py) => {
-    const dr = dragRef.current;
-    if (!dr) return;
-    const ps = piecesRef.current;
-    const piece = ps.find(pc => pc.id === dr.id);
-    if (!piece) { dragRef.current = null; setDragId(null); return; }
-
-    let target = null, best = Infinity;
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-      if (SEED[r][c] != null) continue;
-      if (ps.some(p => p.id !== piece.id && p.placed && p.placed.r === r && p.placed.c === c)) continue;
-      const ctr = cellCenter(r, c);
-      const d = Math.hypot(ctr.x - px, ctr.y - py);
-      if (d < best && d < 55) { best = d; target = { r, c }; }
-    }
-
-    dragRef.current = null;
-    setDragId(null);
-
-    if (target) {
-      const ctr = cellCenter(target.r, target.c);
-      const correct = SOLUTION[target.r][target.c] === piece.value;
-      setPieces(ps2 => ps2.map(pc => pc.id === piece.id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
-      if (!correct) {
-        setError({ r: target.r, c: target.c });
-        setTimeout(() => setError(null), 700);
+      let target = null, best = Infinity;
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        if (seed[r][c] != null) continue;
+        if (ps.some(q => q.id !== id && q.placed && q.placed.r === r && q.placed.c === c)) continue;
+        const ctr = cc(r, c);
+        const d = Math.hypot(ctr.x - p.x, ctr.y - p.y);
+        if (d < best && d < 55) { best = d; target = { r, c }; }
       }
-    } else {
-      setPieces(ps2 => ps2.map(pc => pc.id === piece.id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
-    }
-  };
+
+      if (target) {
+        const ctr = cc(target.r, target.c);
+        const correct = solution[target.r][target.c] === piece.value;
+        setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
+        if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
+      } else {
+        setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
+      }
+    };
+
+    document.addEventListener('touchstart', onStart, { passive: false });
+    document.addEventListener('touchmove',  onMove,  { passive: false });
+    document.addEventListener('touchend',   onEnd,   { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', onStart);
+      document.removeEventListener('touchmove',  onMove);
+      document.removeEventListener('touchend',   onEnd);
+    };
+  }, []); // монтируется один раз
 
   const startDrag = (piece) => (e) => {
+    // Только мышь — тач обрабатывается document listener'ом выше
+    if (e.touches) return;
     e.preventDefault();
     if (solved) return;
-    const { cx, cy } = getClient(e);
-    const p = svgPt(cx, cy);
-    const dr = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
-    dragRef.current = dr;
+    const p = svgPt(e.clientX, e.clientY);
+    dragRef.current = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
     setDragId(piece.id);
     setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placed: null } : pc));
   };
@@ -224,7 +227,29 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   const onMouseUp = (e) => {
     if (!dragRef.current) return;
     const p = svgPt(e.clientX, e.clientY);
-    finishDrag(p.x, p.y);
+    const { id } = dragRef.current;
+    const { pieces: ps, seed, solution, cellCenter: cc } = stateRef.current;
+    const piece = ps.find(pc => pc.id === id);
+    dragRef.current = null;
+    setDragId(null);
+    if (!piece) return;
+
+    let target = null, best = Infinity;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+      if (seed[r][c] != null) continue;
+      if (ps.some(q => q.id !== id && q.placed && q.placed.r === r && q.placed.c === c)) continue;
+      const ctr = cc(r, c);
+      const d = Math.hypot(ctr.x - p.x, ctr.y - p.y);
+      if (d < best && d < 55) { best = d; target = { r, c }; }
+    }
+    if (target) {
+      const ctr = cc(target.r, target.c);
+      const correct = solution[target.r][target.c] === piece.value;
+      setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
+      if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
+    } else {
+      setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
+    }
   };
 
   // Tile renderer
@@ -334,7 +359,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
           const isDrag = dragId === p.id;
           const isErr = error && p.placed && error.r === p.placed.r && error.c === p.placed.c;
           return (
-            <g key={p.id} onMouseDown={startDrag(p)} onTouchStart={startDrag(p)}
+            <g key={p.id} onMouseDown={startDrag(p)}
               style={{ cursor: solved ? 'default' : 'grab' }}>
               <Tile x={p.x} y={p.y} value={p.value} isDrag={isDrag} isErr={isErr} />
             </g>
