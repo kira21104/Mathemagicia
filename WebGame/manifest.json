@@ -1,0 +1,22 @@
+{
+  "name": "Mathemagicia",
+  "short_name": "Mathemagicia",
+  "description": "Книга Магии Математики — головоломки для детей",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0B101D",
+  "theme_color": "#0B101D",
+  "icons": [
+    {
+      "src": "../MathGame/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../MathGame/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

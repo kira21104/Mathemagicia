@@ -1,0 +1,268 @@
+[gd_scene load_steps=10 format=3 uid="uid://dlc4unobe1sk1"]
+
+[ext_resource type="Script" uid="uid://dorqjyoy62srj" path="res://scripts/graph_puzzle.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://b406s8d373xu" path="res://scripts/puzzle_node.gd" id="2_script"]
+
+[sub_resource type="CircleShape2D" id="1_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="2_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="3_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="4_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="5_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="6_shape"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="7_shape"]
+radius = 36.0
+
+[node name="GraphPuzzle" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Lines" type="Node2D" parent="."]
+
+[node name="Nodes" type="Node2D" parent="."]
+
+[node name="Node1" type="Area2D" parent="Nodes"]
+position = Vector2(200, 200)
+script = ExtResource("2_script")
+number = 1
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node1"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node1"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node1"]
+shape = SubResource("1_shape")
+
+[node name="Node2" type="Area2D" parent="Nodes"]
+position = Vector2(400, 150)
+script = ExtResource("2_script")
+number = 2
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node2"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node2"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node2"]
+shape = SubResource("2_shape")
+
+[node name="Node3" type="Area2D" parent="Nodes"]
+position = Vector2(600, 220)
+script = ExtResource("2_script")
+number = 3
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node3"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node3"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "3"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node3"]
+shape = SubResource("3_shape")
+
+[node name="Node4" type="Area2D" parent="Nodes"]
+position = Vector2(150, 420)
+script = ExtResource("2_script")
+number = 4
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node4"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node4"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "4"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node4"]
+shape = SubResource("4_shape")
+
+[node name="Node5" type="Area2D" parent="Nodes"]
+position = Vector2(400, 400)
+script = ExtResource("2_script")
+number = 5
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node5"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node5"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "5"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node5"]
+shape = SubResource("5_shape")
+
+[node name="Node6" type="Area2D" parent="Nodes"]
+position = Vector2(650, 380)
+script = ExtResource("2_script")
+number = 6
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node6"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node6"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "6"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node6"]
+shape = SubResource("6_shape")
+
+[node name="Node7" type="Area2D" parent="Nodes"]
+position = Vector2(400, 620)
+script = ExtResource("2_script")
+number = 7
+
+[node name="Circle" type="ColorRect" parent="Nodes/Node7"]
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+color = Color(0.101961, 0.101961, 0.180392, 1)
+
+[node name="Label" type="Label" parent="Nodes/Node7"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -36.0
+offset_top = -36.0
+offset_right = 36.0
+offset_bottom = 36.0
+text = "7"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Nodes/Node7"]
+shape = SubResource("7_shape")
+
+[node name="DragLine" type="Line2D" parent="."]
+visible = false
+points = PackedVector2Array(0, 0, 0, 0)
+width = 6.0
+default_color = Color(0.302, 0.933, 0.918, 1)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="SumLabel" type="Label" parent="HUD"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 16.0
+offset_bottom = 64.0
+theme_override_colors/font_color = Color(0.831, 0.686, 0.216, 1)
+theme_override_font_sizes/font_size = 32
+text = "0 / 12"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResetButton" type="Button" parent="HUD"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -60.0
+offset_top = -72.0
+offset_right = 60.0
+offset_bottom = -16.0
+theme_override_font_sizes/font_size = 20
+text = "↺  Сначала"
+
+[connection signal="mouse_entered" from="Nodes/Node1" to="Nodes/Node1" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node1" to="Nodes/Node1" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node2" to="Nodes/Node2" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node2" to="Nodes/Node2" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node3" to="Nodes/Node3" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node3" to="Nodes/Node3" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node4" to="Nodes/Node4" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node4" to="Nodes/Node4" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node5" to="Nodes/Node5" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node5" to="Nodes/Node5" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node6" to="Nodes/Node6" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node6" to="Nodes/Node6" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="Nodes/Node7" to="Nodes/Node7" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="Nodes/Node7" to="Nodes/Node7" method="_on_mouse_exited"]
