@@ -125,18 +125,23 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
 
   const ptr = (e) => {
     const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX || (e.touches && e.touches[0].clientX)) - rect.left) * (360 / rect.width);
-    const y = ((e.clientY || (e.touches && e.touches[0].clientY)) - rect.top) * (520 / rect.height);
-    return { x, y };
+    const touch = e.changedTouches ? e.changedTouches[0] : (e.touches ? e.touches[0] : null);
+    const cx = touch ? touch.clientX : e.clientX;
+    const cy = touch ? touch.clientY : e.clientY;
+    return {
+      x: (cx - rect.left) * (360 / rect.width),
+      y: (cy - rect.top)  * (520 / rect.height),
+    };
   };
 
   const startDrag = (piece) => (e) => {
     e.preventDefault();
     if (solved) return;
     const p = ptr(e);
-    // Pop the piece off its slot (so it can be re-placed)
+    const dx = p.x - piece.x;
+    const dy = p.y - piece.y;
     setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placed: null } : pc));
-    setDrag({ id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y });
+    setDrag({ id: piece.id, dx, dy });
     setPointer(p);
   };
 
@@ -158,7 +163,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
       if (pieces.some(p => p.id !== piece.id && p.placed && p.placed.r === r && p.placed.c === c)) continue;
       const ctr = cellCenter(r, c);
       const d = Math.hypot(ctr.x - piece.x, ctr.y - piece.y);
-      if (d < best && d < 38) { best = d; target = { r, c }; }
+      if (d < best && d < 52) { best = d; target = { r, c }; }
     }
     if (target) {
       const ctr = cellCenter(target.r, target.c);
@@ -214,10 +219,11 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   };
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%' }}
-         onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-         onTouchMove={onMove} onTouchEnd={onUp}>
-      <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%" style={{ touchAction:'none', display:'block' }}>
+    <div style={{ position:'relative', width:'100%', height:'100%' }}>
+      <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%"
+        style={{ touchAction:'none', display:'block' }}
+        onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+        onTouchMove={onMove} onTouchEnd={onUp}>
         {/* Chapter mark */}
         <text x="180" y="40" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
           fontSize="13" fill="#D4AF37" letterSpacing="4">II · QUADRATUM</text>
