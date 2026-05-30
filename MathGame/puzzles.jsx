@@ -319,116 +319,271 @@ function GraphPuzzle({ onWin, onSumChange, onHint, paletteAccent = '#4DEEEA', le
 // SHAPES PUZZLE — Chapter III "Геометрия фигур"
 // ─────────────────────────────────────────────────────────────
 
-function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA' }) {
-  const SLOTS = [
-    { id: 'tri', x: 90,  y: 380, shape: 'tri' },
-    { id: 'cir', x: 180, y: 380, shape: 'cir' },
-    { id: 'sqr', x: 270, y: 380, shape: 'sqr' },
-  ];
-  const STARTS = [
-    { id: 'cir', x: 90,  y: 130, shape: 'cir', label: 3 },
-    { id: 'tri', x: 270, y: 130, shape: 'tri', label: 5 },
-    { id: 'sqr', x: 180, y: 220, shape: 'sqr', label: 2 },
-  ];
-  const [pieces, setPieces] = _uS_g(STARTS);
-  const [drag, setDrag] = _uS_g(null);
-  const [pointer, setPointer] = _uS_g(null);
-  const [placed, setPlaced] = _uS_g({});
-  const [solved, setSolved] = _uS_g(false);
-  const svgRef = _uR_g(null);
+// ─────────────────────────────────────────────────────────────
+// MINESWEEPER  —  9×9 grid, tap to reveal, long-press to flag.
+// First tap is always safe. Win: all safe cells revealed.
+// ─────────────────────────────────────────────────────────────
+function msrXr(seed) {
+  let s = seed | 1;
+  return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
+}
 
-  _uE_g(() => {
-    if (Object.keys(placed).length === SLOTS.length) {
-      setSolved(true);
+function msrMineCount(levelIdx) {
+  if (levelIdx <= 5)  return 18;
+  if (levelIdx <= 15) return 24;
+  if (levelIdx <= 30) return 30;
+  return 36;
+}
+
+function msrPlaceMines(firstIdx, total, count, rng) {
+  const pool = Array.from({ length: total }, (_, i) => i).filter(i => i !== firstIdx);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return new Set(pool.slice(0, count));
+}
+
+function msrNeighbours(idx, cols, total) {
+  const r = Math.floor(idx / cols), c = idx % cols;
+  const nb = [];
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (dr === 0 && dc === 0) continue;
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < total / cols && nc >= 0 && nc < cols) nb.push(nr * cols + nc);
+  }
+  return nb;
+}
+
+function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
+  const COLS = 12, ROWS = 12, TOTAL = COLS * ROWS;
+  const MINES = msrMineCount(levelIdx);
+
+  // SVG layout: сетка центрирована в viewBox 420×580
+  const CELL = 35;
+  const GRID_X = (420 - COLS * CELL) / 2;
+  const GRID_Y = 60;
+
+  const rngSeed = levelIdx * 2971 + 13;
+
+  // Состояние игры
+  const [mines, setMines] = _uS_g(null);         // Set<idx> — null до первого хода
+  const [revealed, setRevealed] = _uS_g(new Set());
+  const [marks, setMarks] = _uS_g(new Map()); // idx → 'flag' | 'question'
+  const [dead, setDead] = _uS_g(false);
+  const [won, setWon] = _uS_g(false);
+  const longPressRef = _uR_g(null);
+
+  // Числа соседей — вычисляем когда мины известны
+  const neighbourCount = _uM_g(() => {
+    if (!mines) return {};
+    const res = {};
+    for (let i = 0; i < TOTAL; i++) {
+      if (mines.has(i)) continue;
+      res[i] = msrNeighbours(i, COLS, TOTAL).filter(n => mines.has(n)).length;
+    }
+    return res;
+  }, [mines]);
+
+  // Flood-fill открытие пустых клеток
+  const floodReveal = (startIdx, minesSet, currentRevealed) => {
+    const toReveal = new Set(currentRevealed);
+    const queue = [startIdx];
+    while (queue.length) {
+      const idx = queue.shift();
+      if (toReveal.has(idx)) continue;
+      toReveal.add(idx);
+      const nb = msrNeighbours(idx, COLS, TOTAL);
+      const cnt = nb.filter(n => minesSet.has(n)).length;
+      if (cnt === 0) nb.forEach(n => { if (!toReveal.has(n) && !minesSet.has(n)) queue.push(n); });
+    }
+    return toReveal;
+  };
+
+  const reveal = (idx) => {
+    if (dead || won || marks.get(idx) === 'flag' || revealed.has(idx)) return;
+
+    if (!mines) {
+      // Первый ход — расставляем мины гарантированно не на этот idx
+      const rng = msrXr(rngSeed);
+      const minesSet = msrPlaceMines(idx, TOTAL, MINES, rng);
+      setMines(minesSet);
+      const newRevealed = floodReveal(idx, minesSet, new Set());
+      setRevealed(newRevealed);
+      // Победа сразу (бывает на маленьких полях)
+      if (newRevealed.size === TOTAL - MINES) {
+        setWon(true);
+        setTimeout(() => onWin && onWin(), 1400);
+      }
+      return;
+    }
+
+    if (mines.has(idx)) {
+      setRevealed(r => new Set([...r, idx]));
+      setDead(true);
+      return;
+    }
+
+    const newRevealed = floodReveal(idx, mines, revealed);
+    setRevealed(newRevealed);
+    if (newRevealed.size === TOTAL - MINES) {
+      setWon(true);
       setTimeout(() => onWin && onWin(), 1400);
     }
-  }, [placed]);
-
-  const ptr = (e) => {
-    const rect = svgRef.current.getBoundingClientRect();
-    const cx = e.clientX ?? e.touches?.[0]?.clientX;
-    const cy = e.clientY ?? e.touches?.[0]?.clientY;
-    return {
-      x: (cx - rect.left) * (360 / rect.width),
-      y: (cy - rect.top)  * (520 / rect.height),
-    };
   };
 
-  const startDrag = (piece) => (e) => {
-    e.preventDefault();
-    if (placed[piece.id] || solved) return;
-    setDrag(piece);
-    setPointer(ptr(e));
+  const toggleMark = (idx) => {
+    if (dead || won || revealed.has(idx)) return;
+    setMarks(m => {
+      const next = new Map(m);
+      const cur = next.get(idx);
+      if (!cur)           next.set(idx, 'flag');
+      else if (cur === 'flag') next.set(idx, 'question');
+      else                next.delete(idx); // question → пусто
+      return next;
+    });
   };
 
-  const onMove = (e) => {
-    if (!drag) return;
-    setPointer(ptr(e));
+  const reset = () => {
+    setMines(null);
+    setRevealed(new Set());
+    setMarks(new Map());
+    setDead(false);
+    setWon(false);
   };
 
-  const onUp = () => {
-    if (!drag || !pointer) { setDrag(null); return; }
-    const slot = SLOTS.find(s =>
-      s.shape === drag.shape && Math.hypot(s.x - pointer.x, s.y - pointer.y) < 40
-    );
-    if (slot && !Object.values(placed).includes(slot.id)) {
-      setPlaced(p => ({ ...p, [drag.id]: slot.id }));
-      setPieces(ps => ps.map(p => p.id === drag.id ? { ...p, x: slot.x, y: slot.y } : p));
+  // Pointer handlers — tap = reveal, long press (500ms) = flag
+  const onPointerDown = (idx) => (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    longPressRef.current = setTimeout(() => {
+      longPressRef.current = null;
+      toggleMark(idx);
+    }, 450);
+  };
+
+  const onPointerUp = (idx) => (e) => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+      reveal(idx);
     }
-    setDrag(null);
-    setPointer(null);
   };
 
-  const ShapeGlyph = ({ shape, x, y, size = 28, color, opacity = 1 }) => {
-    const s = size;
-    if (shape === 'cir') return <circle cx={x} cy={y} r={s * 0.55} fill="none" stroke={color} strokeWidth="2" opacity={opacity} />;
-    if (shape === 'tri') return <polygon
-      points={`${x},${y - s * 0.65} ${x + s * 0.6},${y + s * 0.45} ${x - s * 0.6},${y + s * 0.45}`}
-      fill="none" stroke={color} strokeWidth="2" opacity={opacity} />;
-    if (shape === 'sqr') return <rect x={x - s * 0.5} y={y - s * 0.5} width={s} height={s}
-      fill="none" stroke={color} strokeWidth="2" opacity={opacity} />;
-    return null;
+  const onPointerCancel = () => {
+    if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   };
+
+  // Цвет цифры по количеству соседей (классические цвета сапёра)
+  const numColor = n => ['', '#4DEEEA','#57D26B','#FF6B6B','#7B5EA7','#C0392B','#1ABC9C','#2C3E50','#888'][n] || '#888';
+
+  const cellX = idx => GRID_X + (idx % COLS) * CELL + CELL / 2;
+  const cellY = idx => GRID_Y + Math.floor(idx / COLS) * CELL + CELL / 2;
+
+  const flagCount = [...marks.values()].filter(v => v === 'flag').length;
+  const minesLeft = MINES - flagCount;
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%' }}
-      onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-      onTouchMove={onMove} onTouchEnd={onUp}>
-      <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%"
-        style={{ touchAction:'none', display:'block' }}>
+    <div style={{ position:'relative', width:'100%', height:'100%' }}>
+      <svg viewBox="0 0 420 580" width="100%" height="100%" style={{ touchAction:'none', display:'block' }}>
 
-        {/* Слоты */}
-        {SLOTS.map(s => (
-          <g key={s.id}>
-            <circle cx={s.x} cy={s.y} r="36"
-              fill="rgba(212,175,55,0.06)" stroke="rgba(212,175,55,0.35)" strokeWidth="1" strokeDasharray="4 4" />
-            <ShapeGlyph shape={s.shape} x={s.x} y={s.y} size={32}
-              color={placed[s.id] ? paletteAccent : 'rgba(212,175,55,0.4)'} />
-          </g>
-        ))}
+        {/* Заголовок */}
+        <text x="210" y="35" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
+          fontSize="13" fill="#D4AF37" letterSpacing="4">III · TENEBRAE</text>
 
-        {/* Фигуры */}
-        {pieces.map(p => {
-          const isPlaced = !!placed[p.id];
-          const isDragging = drag?.id === p.id;
-          const px = isDragging && pointer ? pointer.x : p.x;
-          const py = isDragging && pointer ? pointer.y : p.y;
+        {/* Счётчик мин и статус */}
+        <text x="28" y="55" fontFamily="Comfortaa, sans-serif" fontSize="11" fill="rgba(212,175,55,0.7)">
+          {'✦ ' + minesLeft}
+        </text>
+        {dead && (
+          <text x="210" y="55" textAnchor="middle" fontFamily="Cormorant Garamond, serif"
+            fontStyle="italic" fontSize="12" fill="#FF6B6B">· tenebrае vicerunt ·</text>
+        )}
+        {won && (
+          <text x="210" y="55" textAnchor="middle" fontFamily="Cormorant Garamond, serif"
+            fontStyle="italic" fontSize="12" fill="#E5C158">· lux aeterna ·</text>
+        )}
+
+        {/* Сетка */}
+        {Array.from({ length: TOTAL }, (_, idx) => {
+          const cx = cellX(idx), cy = cellY(idx);
+          const isRevealed = revealed.has(idx);
+          const mark = marks.get(idx); // 'flag' | 'question' | undefined
+          const isMine = mines && mines.has(idx);
+          const isBoom = dead && isMine && isRevealed;
+          const cnt = neighbourCount[idx] || 0;
+
           return (
-            <g key={p.id}
-              onMouseDown={startDrag(p)} onTouchStart={startDrag(p)}
-              style={{ cursor: isPlaced ? 'default' : 'grab' }}>
-              <circle cx={px} cy={py} r="34"
-                fill={isPlaced ? 'rgba(77,238,234,0.1)' : 'rgba(11,16,29,0.85)'}
-                stroke={isPlaced ? paletteAccent : '#D4AF37'}
-                strokeWidth={isPlaced ? 2 : 1.5}
-                style={{ filter: isPlaced ? `drop-shadow(0 0 8px ${paletteAccent})` : 'none' }} />
-              <ShapeGlyph shape={p.shape} x={px} y={py} size={30}
-                color={isPlaced ? '#fff3b8' : '#E5C158'} />
-              <text x={px} y={py + 50} textAnchor="middle"
-                fontFamily="Cinzel, serif" fontSize="13" fill="rgba(229,193,88,0.7)">{p.label}</text>
+            <g key={idx}
+              onPointerDown={onPointerDown(idx)}
+              onPointerUp={onPointerUp(idx)}
+              onPointerCancel={onPointerCancel}
+              style={{ touchAction: 'none', cursor: isRevealed ? 'default' : 'pointer' }}>
+
+              {/* Фон клетки */}
+              <rect
+                x={GRID_X + (idx % COLS) * CELL + 1}
+                y={GRID_Y + Math.floor(idx / COLS) * CELL + 1}
+                width={CELL - 2} height={CELL - 2} rx="3"
+                fill={
+                  isBoom        ? 'rgba(255,80,80,0.35)' :
+                  isRevealed    ? 'rgba(11,16,29,0.3)' :
+                  'rgba(11,16,29,0.75)'
+                }
+                stroke={
+                  isBoom        ? '#FF6B6B' :
+                  isRevealed    ? 'rgba(212,175,55,0.15)' :
+                  'rgba(212,175,55,0.35)'
+                }
+                strokeWidth="0.6"
+              />
+
+              {/* Содержимое */}
+              {isRevealed && isMine && (
+                <text x={cx} y={cy + 5} textAnchor="middle" fontSize="14">✦</text>
+              )}
+              {isRevealed && !isMine && cnt > 0 && (
+                <text x={cx} y={cy + 5} textAnchor="middle"
+                  fontFamily="Cinzel, serif" fontWeight="700" fontSize="14"
+                  fill={numColor(cnt)}
+                  style={{ filter: `drop-shadow(0 0 3px ${numColor(cnt)})` }}>{cnt}</text>
+              )}
+              {!isRevealed && mark === 'flag' && (
+                <g transform={`translate(${cx}, ${cy})`}
+                  style={{ filter: 'drop-shadow(0 0 6px #E5C158)' }}>
+                  <polygon points="0,-11 2.8,-2.8 11,0 2.8,2.8 0,11 -2.8,2.8 -11,0 -2.8,-2.8"
+                    fill="#E5C158" />
+                </g>
+              )}
+              {!isRevealed && mark === 'question' && (
+                <text x={cx} y={cy + 5} textAnchor="middle"
+                  fontFamily="Cinzel, serif" fontWeight="700" fontSize="15"
+                  fill="rgba(212,175,55,0.75)"
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(212,175,55,0.5))' }}>?</text>
+              )}
+              {/* Тусклая точка на нераскрытой без метки */}
+              {!isRevealed && !mark && (
+                <circle cx={cx} cy={cy} r="1.5" fill="rgba(212,175,55,0.25)" />
+              )}
             </g>
           );
         })}
+
+        {/* Кнопка рестарта после проигрыша */}
+        {dead && (
+          <g onClick={reset} style={{ cursor: 'pointer' }}>
+            <rect x="150" y="508" width="120" height="36" rx="8"
+              fill="rgba(11,16,29,0.9)" stroke="#D4AF37" strokeWidth="1" />
+            <text x="210" y="531" textAnchor="middle"
+              fontFamily="Cinzel, serif" fontSize="13" fill="#D4AF37" letterSpacing="2">ITERUM</text>
+          </g>
+        )}
+
+        {/* Подсказка */}
+        {!dead && !won && (
+          <text x="210" y="558" textAnchor="middle"
+            fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="14"
+            fill="rgba(212,175,55,0.4)">· удержи для флага · тап для открытия ·</text>
+        )}
       </svg>
     </div>
   );

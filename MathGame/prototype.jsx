@@ -15,13 +15,13 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
     ru: [
       'Проведи цепочку через узлы — сумма чисел должна равняться цели.',
       'Расставьте числа так, чтобы сумма по строкам, столбцам и диагоналям равнялась 15.',
-      'Перенесите алхимические фигуры в их пазы.',
+      'Раскройте тьму — найдите все безопасные звёзды. Удержите, чтобы отметить опасную.',
       'Соедините звёзды по порядку и проявите созвездие.',
     ],
     en: [
       'Draw a chain through the nodes — the sum must equal the target.',
       'Place the numbers so every row, column and diagonal sums to 15.',
-      'Drag each alchemical shape into its slot.',
+      'Unveil the darkness — find all safe stars. Hold to mark a dangerous one.',
       'Connect the stars in order to reveal the constellation.',
     ],
   };
