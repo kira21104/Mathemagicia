@@ -96,8 +96,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   const [solved, setSolved] = _uS_q(false);
   const [error, setError] = _uS_q(null);
   const svgRef = _uR_q(null);
-  const dragRef = _uR_q(null);   // { id, dx, dy } — читается в document-обработчиках
-  const stateRef = _uR_q({ pieces: initialPieces, seed: SEED, solution: SOLUTION, cellCenter, solved: false });
+  const dragRef = _uR_q(null); // { id, dx, dy } — синхронно, без батчинга
 
   // Compute grid values from placed pieces + seeds
   const gridValues = (() => {
@@ -112,9 +111,6 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     ? gridValues[0][0] + gridValues[1][1] + gridValues[2][2]
     : gridValues[0][2] + gridValues[1][1] + gridValues[2][0];
   const cellFilled = (r, c) => gridValues[r][c] != null;
-
-  // Всегда актуальный snapshot для document-обработчиков
-  stateRef.current = { pieces, seed: SEED, solution: SOLUTION, cellCenter, solved };
 
   // Win check
   _uE_q(() => {
@@ -135,121 +131,49 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     };
   };
 
-  // Все touch-обработчики вешаем на document с passive:false —
-  // JSX onTouchStart пассивен в современных браузерах, preventDefault там игнорируется,
-  // браузер начинает scroll-жест и перехватывает touchmove даже у наших passive:false листенеров.
-  _uE_q(() => {
-    const onStart = (e) => {
-      if (stateRef.current.solved) return;
-      const t = e.touches[0];
-      const p = svgPt(t.clientX, t.clientY);
-      const { pieces: ps } = stateRef.current;
-      // Ищем фишку под пальцем (по SVG-координатам)
-      let hit = null;
-      for (let i = ps.length - 1; i >= 0; i--) {
-        const pc = ps[i];
-        if (Math.hypot(pc.x - p.x, pc.y - p.y) < 30) { hit = pc; break; }
-      }
-      if (!hit) return;
-      e.preventDefault(); // теперь можем — мы в passive:false листенере
-      dragRef.current = { id: hit.id, dx: p.x - hit.x, dy: p.y - hit.y };
-      setDragId(hit.id);
-      setPieces(ps2 => ps2.map(pc => pc.id === hit.id ? { ...pc, placed: null } : pc));
-    };
-
-    const onMove = (e) => {
-      if (!dragRef.current) return;
-      e.preventDefault();
-      const t = e.touches[0];
-      const p = svgPt(t.clientX, t.clientY);
-      const { id, dx, dy } = dragRef.current;
-      setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
-    };
-
-    const onEnd = (e) => {
-      if (!dragRef.current) return;
-      const t = e.changedTouches[0];
-      const p = svgPt(t.clientX, t.clientY);
-      const { id } = dragRef.current;
-      const { pieces: ps, seed, solution, cellCenter: cc } = stateRef.current;
-      const piece = ps.find(pc => pc.id === id);
-      dragRef.current = null;
-      setDragId(null);
-      if (!piece) return;
-
-      let target = null, best = Infinity;
-      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-        if (seed[r][c] != null) continue;
-        if (ps.some(q => q.id !== id && q.placed && q.placed.r === r && q.placed.c === c)) continue;
-        const ctr = cc(r, c);
-        const d = Math.hypot(ctr.x - p.x, ctr.y - p.y);
-        if (d < best && d < 55) { best = d; target = { r, c }; }
-      }
-
-      if (target) {
-        const ctr = cc(target.r, target.c);
-        const correct = solution[target.r][target.c] === piece.value;
-        setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
-        if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
-      } else {
-        setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
-      }
-    };
-
-    document.addEventListener('touchstart', onStart, { passive: false });
-    document.addEventListener('touchmove',  onMove,  { passive: false });
-    document.addEventListener('touchend',   onEnd,   { passive: false });
-    return () => {
-      document.removeEventListener('touchstart', onStart);
-      document.removeEventListener('touchmove',  onMove);
-      document.removeEventListener('touchend',   onEnd);
-    };
-  }, []); // монтируется один раз
-
-  const startDrag = (piece) => (e) => {
-    // Только мышь — тач обрабатывается document listener'ом выше
-    if (e.touches) return;
-    e.preventDefault();
+  // Pointer events работают одинаково для мыши и пальца.
+  // setPointerCapture гарантирует что pointermove/pointerup приходят даже вне элемента.
+  const onPointerDown = (piece) => (e) => {
     if (solved) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const p = svgPt(e.clientX, e.clientY);
     dragRef.current = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
     setDragId(piece.id);
     setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placed: null } : pc));
   };
 
-  const onMouseMove = (e) => {
+  const onPointerMove = (e) => {
     if (!dragRef.current) return;
     const p = svgPt(e.clientX, e.clientY);
     const { id, dx, dy } = dragRef.current;
     setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
   };
 
-  const onMouseUp = (e) => {
+  const onPointerUp = (e) => {
     if (!dragRef.current) return;
     const p = svgPt(e.clientX, e.clientY);
     const { id } = dragRef.current;
-    const { pieces: ps, seed, solution, cellCenter: cc } = stateRef.current;
-    const piece = ps.find(pc => pc.id === id);
     dragRef.current = null;
     setDragId(null);
-    if (!piece) return;
-
-    let target = null, best = Infinity;
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-      if (seed[r][c] != null) continue;
-      if (ps.some(q => q.id !== id && q.placed && q.placed.r === r && q.placed.c === c)) continue;
-      const ctr = cc(r, c);
-      const d = Math.hypot(ctr.x - p.x, ctr.y - p.y);
-      if (d < best && d < 55) { best = d; target = { r, c }; }
-    }
-    if (target) {
-      const ctr = cc(target.r, target.c);
-      const correct = solution[target.r][target.c] === piece.value;
-      setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc));
-      if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
-    } else {
-      setPieces(ps2 => ps2.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc));
-    }
+    setPieces(ps => {
+      const piece = ps.find(pc => pc.id === id);
+      if (!piece) return ps;
+      let target = null, best = Infinity;
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+        if (SEED[r][c] != null) continue;
+        if (ps.some(q => q.id !== id && q.placed && q.placed.r === r && q.placed.c === c)) continue;
+        const ctr = cellCenter(r, c);
+        const d = Math.hypot(ctr.x - p.x, ctr.y - p.y);
+        if (d < best && d < 55) { best = d; target = { r, c }; }
+      }
+      if (target) {
+        const ctr = cellCenter(target.r, target.c);
+        const correct = SOLUTION[target.r][target.c] === piece.value;
+        if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
+        return ps.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc);
+      }
+      return ps.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc);
+    });
   };
 
   // Tile renderer
@@ -292,7 +216,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
     <div style={{ position:'relative', width:'100%', height:'100%' }}>
       <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%"
         style={{ touchAction:'none', display:'block' }}
-        onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
         {/* Chapter mark */}
         <text x="180" y="40" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
           fontSize="13" fill="#D4AF37" letterSpacing="4">II · QUADRATUM</text>
@@ -359,8 +283,8 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
           const isDrag = dragId === p.id;
           const isErr = error && p.placed && error.r === p.placed.r && error.c === p.placed.c;
           return (
-            <g key={p.id} onMouseDown={startDrag(p)}
-              style={{ cursor: solved ? 'default' : 'grab' }}>
+            <g key={p.id} onPointerDown={onPointerDown(p)}
+              style={{ cursor: solved ? 'default' : 'grab', touchAction: 'none' }}>
               <Tile x={p.x} y={p.y} value={p.value} isDrag={isDrag} isErr={isErr} />
             </g>
           );
