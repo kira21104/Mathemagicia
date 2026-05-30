@@ -355,7 +355,7 @@ function msrNeighbours(idx, cols, total) {
   return nb;
 }
 
-function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal' }) {
+function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
   const COLS = 12, ROWS = 12, TOTAL = COLS * ROWS;
   const MINES = msrMineCount(levelIdx, difficulty);
 
@@ -582,7 +582,7 @@ function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         {!dead && !won && (
           <text x="210" y="558" textAnchor="middle"
             fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="14"
-            fill="rgba(212,175,55,0.4)">· удержи для флага · тап для открытия ·</text>
+            fill="rgba(212,175,55,0.4)">{lang === 'en' ? '· hold to flag · tap to reveal ·' : '· удержи для флага · тап для открытия ·'}</text>
         )}
       </svg>
     </div>

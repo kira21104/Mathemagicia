@@ -41,6 +41,10 @@ const STRINGS = {
     understood: 'Понятно',
     notStarted: '— не начата —',
     start: 'Начать',
+    skyTitle: 'Небо открытий',
+    skySubtitle: 'Коллекция созвездий',
+    skyEmpty: 'Пройди первый уровень,\nчтобы открыть созвездие',
+    accent: 'Акцент',
   },
   en: {
     open: 'Open',
@@ -79,6 +83,10 @@ const STRINGS = {
     understood: 'Got it',
     notStarted: '— not started —',
     start: 'Start',
+    skyTitle: 'Sky of discoveries',
+    skySubtitle: 'Constellation collection',
+    skyEmpty: 'Complete the first level\nto unlock a constellation',
+    accent: 'Accent',
   },
 };
 const useT = (lang) => (k) => (STRINGS[lang] || STRINGS.ru)[k];

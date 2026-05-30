@@ -502,7 +502,7 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
 // CONSTELLATION  —  Connect numbered stars 1 → 2 → 3 → …
 // Each step emits a cyan trail; finishing the sequence reveals a constellation.
 // ─────────────────────────────────────────────────────────────
-function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA' }) {
+function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) {
   // Numbered stars in order. Layout in 360x520
   const STARS = [
     { id: 1, x:  70, y: 110 },
@@ -697,7 +697,7 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA' }) {
         <text x="180" y="490" textAnchor="middle"
           fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="12"
           fill="rgba(212,175,55,0.55)">
-          {solved ? '· Constellatio revelata ·' : `· Соедините звезду ${lastConnected} → ${Math.min(lastConnected + 1, NEXT)} ·`}
+          {solved ? '· Constellatio revelata ·' : lang === 'en' ? `· Connect star ${lastConnected} → ${Math.min(lastConnected + 1, NEXT)} ·` : `· Соедините звезду ${lastConnected} → ${Math.min(lastConnected + 1, NEXT)} ·`}
         </text>
       </svg>
     </div>
@@ -761,7 +761,7 @@ function msStarGenSolution(seed) {
   return [...ext, ...inn];
 }
 
-function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal' }) {
+function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
   const CX = 180, CY = 275, R = 150, r = 63;
   const NODES = msStarNodes(CX, CY, R, r);
   const svgRef = _uR_q(null);
@@ -976,7 +976,7 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
         {/* Подсказка суммы */}
         <text x="180" y="58" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="15"
           fill="rgba(212,175,55,0.85)">
-          {solved ? '· Stella revelata ·' : '· Каждый луч — сумма 22 ·'}
+          {solved ? '· Stella revelata ·' : lang === 'en' ? '· Every ray sums to 22 ·' : '· Каждый луч — сумма 22 ·'}
         </text>
       </svg>
     </div>
@@ -1071,7 +1071,7 @@ function htGenLevel(levelIdx, difficulty) {
   return { grid, solution, size };
 }
 
-function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal' }) {
+function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
   const { grid: GRID, solution: SOLUTION, size } = _uM_q(
     () => htGenLevel(levelIdx, difficulty), [levelIdx, difficulty]
   );
@@ -1264,7 +1264,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         <text x={W/2} y={PAD_TOP + size*CELL + 22} textAnchor="middle"
           fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="15"
           fill="rgba(212,175,55,0.85)">
-          {solved ? '· Hitori solutum ·' : '· Тап — зачеркнуть · ещё раз — кружок · ещё — убрать ·'}
+          {solved ? '· Hitori solutum ·' : lang === 'en' ? '· Tap — cross out · again — circle · again — clear ·' : '· Тап — зачеркнуть · ещё раз — кружок · ещё — убрать ·'}
         </text>
       </svg>
     </div>

@@ -115,7 +115,7 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
         {/* Inner velvet vignette */}
         <div style={{ position:'absolute', inset:14 }}>
           <Puzzle key={`${resetKey}-${difficulty}`} onWin={handleWin} paletteAccent={paletteAccent} levelIdx={levelIdx}
-            difficulty={difficulty}
+            difficulty={difficulty} lang={lang}
             onSumChange={chapterIdx === 0 ? (sum, target) => setSumInfo({ sum, target }) : undefined}
             onHint={chapterIdx === 0 ? (h) => setHintText(h) : undefined} />
         </div>
@@ -144,6 +144,7 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
         onContinue={onWin}
         onChapters={onChapters}
         lang={lang} paletteAccent={paletteAccent}
+        levelIdx={levelIdx}
       />}
     </div>
   );
@@ -153,7 +154,8 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
 function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel = 1, variant = 'night', paletteAccentOverride, scale = 1 }) {
   const [screen, setScreen] = _uS_p(initialScreen);
   const [chapter, setChapter] = _uS_p(initialChapter);
-  const [lang, setLang] = _uS_p('ru');
+  const [lang, setLang] = _uS_p(() => localStorage.getItem('mathgame_lang') || 'en');
+  const setLangPersist = (l) => { localStorage.setItem('mathgame_lang', l); setLang(l); };
   const [paletteAccent, setPaletteAccent] = _uS_p(paletteAccentOverride || '#4DEEEA');
   const [theme, setTheme] = _uS_p(variant);
   // Счётчик пройденных уровней по каждой главе (0 = не начата)
@@ -205,7 +207,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
     body = <LoadingScreen onDone={() => setScreen('cover')} lang={lang} paletteAccent={paletteAccent} />;
   } else if (screen === 'cover') {
     body = <CoverScreen onOpen={() => setScreen('chapters')} onSettings={() => setScreen('settings')}
-      lang={lang} setLang={setLang} paletteAccent={paletteAccent} />;
+      lang={lang} setLang={setLangPersist} paletteAccent={paletteAccent} />;
   } else if (screen === 'chapters') {
     body = <ChapterSelect onBack={() => setScreen('cover')}
       onPickLevel={(c, _lvl, diff) => { setChapter(c); if (diff) setDifficulty(diff); setScreen('game'); }}
@@ -220,7 +222,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
       lang={lang} paletteAccent={paletteAccent} difficulty={difficulty} />;
   } else if (screen === 'settings') {
     body = <SettingsScreen onBack={() => setScreen('cover')}
-      lang={lang} setLang={setLang}
+      lang={lang} setLang={setLangPersist}
       paletteAccent={paletteAccent} setPaletteAccent={setPaletteAccent}
       theme={theme} setTheme={setTheme} />;
   }

@@ -123,7 +123,7 @@ function getConstellationData(pageIdx, chapterIdx = 0) {
     y: Math.round(pad + (s.y - minY) / rangeY * (240 - pad * 2)),
     r: s.r || 2.8,
   }));
-  return { pts, lines: c.lines || [], ru: c.ru, la: c.la };
+  return { pts, lines: c.lines || [], ru: c.ru, en: c.en, la: c.la };
 }
 
 function getPagePoints(pageIdx, chapterIdx = 0) {
@@ -492,10 +492,10 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
             <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:12,
               color:'rgba(229,193,88,0.75)', letterSpacing:0.5, textAlign:'center' }}>
-              {pageConstellation.ru}
+              {pageConstellation[lang] || pageConstellation.ru}
             </div>
             <div style={{ fontFamily:'Comfortaa, sans-serif', fontSize:9, letterSpacing:2, color:'rgba(212,175,55,0.5)' }}>
-              {doneLevels > 0 ? `${doneLevels} ${t('solved').toUpperCase()}` : t('notStarted') || '— не начата —'}
+              {doneLevels > 0 ? `${doneLevels} ${t('solved').toUpperCase()}` : t('notStarted')}
             </div>
           </div>
         </div>
@@ -530,7 +530,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
           textTransform:'uppercase',
           boxShadow:`0 0 18px ${paletteAccent}33, inset 0 0 12px ${paletteAccent}22`,
         }}>
-          <span>{doneLevels === 0 ? (t('start') || 'Начать') : t('openLevel')}</span>
+          <span>{doneLevels === 0 ? t('start') : t('openLevel')}</span>
           <span style={{ width:1, height:14, background:'rgba(229,193,88,0.4)' }} />
           <span style={{ fontFamily:'Comfortaa, sans-serif', fontSize:13, letterSpacing:2, color: paletteAccent,
             textShadow:`0 0 8px ${paletteAccent}`, fontWeight:500 }}>
@@ -565,6 +565,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
           chapters={chapters}
           chapterLevels={chapterLevels}
           paletteAccent={paletteAccent}
+          lang={lang}
           onClose={() => setSkyOpen(false)}
         />
       )}
@@ -573,7 +574,8 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
 }
 
 // ─────────────────────────── SKY COLLECTION (global — all chapters)
-function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, onClose }) {
+function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, lang = 'ru', onClose }) {
+  const t = useT(lang);
   const LEVELS_PER_PAGE = 6;
   const chapterRomanNums = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
@@ -587,7 +589,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       const starsTotal = cdata.pts.length;
       const pageStart = pi * LEVELS_PER_PAGE;
       const starsLit = Math.min(starsTotal, done - pageStart);
-      return { pts: cdata.pts, lines: cdata.lines, ru: cdata.ru, la: cdata.la, starsLit, pi, ci };
+      return { pts: cdata.pts, lines: cdata.lines, ru: cdata.ru, en: cdata.en, la: cdata.la, starsLit, pi, ci };
     });
     return { chapterName, ci, constellations };
   }).filter(Boolean);
@@ -614,8 +616,8 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
 
       {/* Header */}
       <div style={{ position:'relative', zIndex:2, marginTop:66, textAlign:'center', paddingBottom:10 }}>
-        <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:6, color:'rgba(212,175,55,0.55)', textTransform:'uppercase' }}>Небо открытий</div>
-        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:20, color:'#fff3b8', marginTop:3, letterSpacing:0.5 }}>Коллекция созвездий</div>
+        <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:6, color:'rgba(212,175,55,0.55)', textTransform:'uppercase' }}>{t('skyTitle')}</div>
+        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:20, color:'#fff3b8', marginTop:3, letterSpacing:0.5 }}>{t('skySubtitle')}</div>
         <div style={{ width:70, height:1, margin:'8px auto 0', background:'linear-gradient(90deg,transparent,#D4AF37,transparent)', opacity:0.5 }} />
       </div>
 
@@ -625,7 +627,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
           <div style={{ textAlign:'center', marginTop:80,
             fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
             fontSize:17, color:'rgba(229,193,88,0.35)', lineHeight:1.5 }}>
-            Пройди первый уровень,<br/>чтобы открыть созвездие
+            {t('skyEmpty').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br/>}</span>)}
           </div>
         ) : (
           allGroups.map(({ chapterName, ci, constellations }) => (
@@ -642,7 +644,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
 
               {/* Карточки созвездий этой главы */}
               <div style={{ display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center' }}>
-                {constellations.map(({ pts, lines, ru, la, starsLit, pi }) => (
+                {constellations.map(({ pts, lines, ru, en, la, starsLit, pi }) => (
                   <div key={`${ci}-${pi}`} style={{
                     width: 134,
                     background:'rgba(8,12,28,0.82)',
@@ -681,7 +683,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                       fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
                       fontSize:11, color:'rgba(229,193,88,0.85)', textAlign:'center',
                       marginTop:4, lineHeight:1.2,
-                    }}>{ru}</div>
+                    }}>{lang === 'en' ? (en || ru) : ru}</div>
                     {la && (
                       <div style={{
                         fontFamily:'Comfortaa, sans-serif', fontSize:7, letterSpacing:0.5,
@@ -707,9 +709,37 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
 }
 
 // ─────────────────────────── WIN
-function WinOverlay({ onContinue, onChapters, lang, paletteAccent }) {
+const WIN_MESSAGES = [
+  {
+    ru: { title: 'Уровень пройден', sub: 'Ещё одна страница книги ожила' },
+    en: { title: 'Level complete', sub: 'Another page of the book came to life' },
+  },
+  {
+    ru: { title: 'Ты молодец', sub: 'Магия чисел тебе покорилась' },
+    en: { title: 'Well done', sub: 'The magic of numbers has yielded to you' },
+  },
+  {
+    ru: { title: 'Безупречно', sub: 'Ещё три звезды зажглись на твоём небосклоне' },
+    en: { title: 'Flawless', sub: 'Three more stars lit up your firmament' },
+  },
+  {
+    ru: { title: 'Формула раскрыта', sub: 'Чернила слагаются в новое заклинание' },
+    en: { title: 'Formula revealed', sub: 'The ink weaves itself into a new spell' },
+  },
+  {
+    ru: { title: 'Гримуар доволен', sub: 'Знание прибавилось — тьма отступила' },
+    en: { title: 'The grimoire is pleased', sub: 'Knowledge grows — the darkness retreats' },
+  },
+  {
+    ru: { title: 'Созвездие открыто', sub: 'Звёзды выстроились по твоей воле' },
+    en: { title: 'Constellation unlocked', sub: 'The stars aligned at your command' },
+  },
+];
+
+function WinOverlay({ onContinue, onChapters, lang, paletteAccent, levelIdx = 1 }) {
   const t = useT(lang);
   const [stage, setStage] = _uS_s(0);
+  const msg = WIN_MESSAGES[(levelIdx - 1) % WIN_MESSAGES.length][lang] || WIN_MESSAGES[(levelIdx - 1) % WIN_MESSAGES.length].ru;
 
   _uE_s(() => {
     const t1 = setTimeout(() => setStage(1), 200);
@@ -765,8 +795,8 @@ function WinOverlay({ onContinue, onChapters, lang, paletteAccent }) {
         <Astrolabe size={120} color="#E5C158" strokeOp={0.55} spin={true} />
 
         <div style={{ marginTop: 20, textAlign:'center' }}>
-          <div className="gold-shimmer" style={{ fontFamily:'Cinzel, serif', fontWeight:600, fontSize:28, letterSpacing:5, textTransform:'uppercase' }}>{t('win')}</div>
-          <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:16, color:'rgba(229,193,88,0.85)', marginTop:8, lineHeight:1.4 }}>«{t('winSub')}»</div>
+          <div className="gold-shimmer" style={{ fontFamily:'Cinzel, serif', fontWeight:600, fontSize:24, letterSpacing:4, textTransform:'uppercase', lineHeight:1.15 }}>{msg.title}</div>
+          <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:16, color:'rgba(229,193,88,0.85)', marginTop:10, lineHeight:1.45 }}>«{msg.sub}»</div>
         </div>
 
         <div style={{ display:'flex', justifyContent:'center', gap: 6, margin:'18px auto 0' }}>
@@ -791,7 +821,7 @@ function WinOverlay({ onContinue, onChapters, lang, paletteAccent }) {
             background:'transparent',
             fontFamily:'Cinzel, serif', letterSpacing:3, color:'rgba(229,193,88,0.6)', fontSize:11,
             textTransform:'uppercase',
-          }}>{t('chooseTitle') || 'Выбор главы'}</button>
+          }}>{t('chooseTitle')}</button>
         </div>
       </div>
     </div>
@@ -860,7 +890,7 @@ function ChapterInfoModal({ onClose, lang, paletteAccent, chapterIdx }) {
           fontFamily:'Cinzel, serif', letterSpacing:3, fontSize:12,
           color:'#E5C158', textTransform:'uppercase',
           boxShadow:'0 0 16px rgba(212,175,55,0.15)',
-        }}>{t('understood') || 'Понятно'}</button>
+        }}>{t('understood')}</button>
       </div>
     </div>
   );
@@ -904,7 +934,7 @@ function HintModal({ onClose, lang, paletteAccent, hintText }) {
           fontFamily:'Cinzel, serif', letterSpacing:3, fontSize:12,
           color:'#E5C158', textTransform:'uppercase',
           boxShadow:'0 0 16px rgba(212,175,55,0.15)',
-        }}>{t('understood') || 'Понятно'}</button>
+        }}>{t('understood')}</button>
       </div>
     </div>
   );
@@ -998,7 +1028,7 @@ function SettingsScreen({ onBack, lang, setLang, paletteAccent, setPaletteAccent
 
         <div className="gold-frame" style={{ padding:'18px 20px 18px', borderRadius:10, background:'rgba(11,16,29,0.5)' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:17, color:'#f1e2b8' }}>Акцент</div>
+            <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:17, color:'#f1e2b8' }}>{t('accent')}</div>
             <div style={{ display:'flex', gap:12 }}>
               {['#4DEEEA', '#70FFA0', '#E5C158', '#b78cff'].map(c => (
                 <Swatch key={c} color={c} active={paletteAccent === c} onClick={() => setPaletteAccent(c)} />
