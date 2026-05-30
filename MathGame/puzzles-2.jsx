@@ -75,10 +75,10 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
   );
 
   // SVG layout in 360 × 520
-  const CELL = 70, GRID_X = 75, GRID_Y = 70;
+  const CELL = 70, GRID_X = 75, GRID_Y = 100;
   const cellCenter = (r, c) => ({ x: GRID_X + c * CELL + CELL / 2, y: GRID_Y + r * CELL + CELL / 2 });
 
-  const trayY = 410, traySpacing = 50;
+  const trayY = 450, traySpacing = 50;
   const TILE_R = 22;
   // Центрируем лоток по количеству фишек
   const trayStartX = 180 - ((SHUFFLED.length - 1) * traySpacing) / 2;
