@@ -110,7 +110,7 @@ function getConstellationData(pageIdx, chapterIdx = 0) {
   const db = window.CONSTELLATIONS_DB;
   if (!db || !db.length) return { pts: [{x:80,y:120,r:2.8}], lines: [], ru: '?' };
   const total = db.length;
-  const offset = Math.floor((chapterIdx / 4) * total);
+  const offset = Math.floor((chapterIdx / 6) * total);
   const c = db[(offset + pageIdx) % total];
   // Масштабируем координаты в viewBox 160×240 с отступом
   const xs = c.stars.map(s => s.x), ys = c.stars.map(s => s.y);
@@ -131,7 +131,7 @@ function getPagePoints(pageIdx, chapterIdx = 0) {
 }
 
 // ─────────────────────────── CHAPTERS — book spread
-function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels = [0,0,0,0], initialChapterIdx = 0 }) {
+function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels = [0,0,0,0,0,0], initialChapterIdx = 0 }) {
   const t = useT(lang);
   const [chapterIdx, setChapterIdx] = _uS_s(initialChapterIdx);
   const [skyOpen, setSkyOpen] = _uS_s(false);
@@ -144,6 +144,8 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
     [{x:50,y:55,r:2.6},{x:110,y:55,r:2.6},{x:80,y:100,r:3.2},{x:50,y:155,r:2.6},{x:110,y:155,r:2.6},{x:80,y:210,r:2.8}],
     [{x:80,y:35,r:3},{x:35,y:115,r:2.4},{x:125,y:115,r:2.4},{x:60,y:200,r:3},{x:100,y:200,r:2.6},{x:80,y:130,r:3.2}],
     [{x:45,y:65,r:2.4},{x:90,y:40,r:2.8},{x:135,y:80,r:3},{x:120,y:145,r:2.6},{x:65,y:155,r:3.2},{x:50,y:205,r:2.4}],
+    [{x:80,y:40,r:3.2},{x:130,y:90,r:2.4},{x:110,y:155,r:2.8},{x:50,y:155,r:2.8},{x:30,y:90,r:2.4},{x:80,y:120,r:2}],
+    [{x:50,y:50,r:2.6},{x:110,y:50,r:2.6},{x:110,y:110,r:2.6},{x:50,y:110,r:2.6},{x:80,y:170,r:3},{x:80,y:220,r:2.4}],
   ];
 
   // Engraving per chapter — different visual
@@ -186,7 +188,31 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
           <circle key={i} cx={x} cy={y} r="3" fill="#5b4a2a" />)}
       </g>
     </svg>,
+    <svg viewBox="0 0 200 240" key="4">
+      <g stroke="#5b4a2a" strokeWidth="0.7" fill="none">
+        {Array.from({length:5}).map((_,i)=><line key={`h${i}`} x1="30" y1={60+i*30} x2="170" y2={60+i*30} strokeWidth="0.4"/>)}
+        {Array.from({length:5}).map((_,i)=><line key={`v${i}`} x1={30+i*35} y1="60" x2={30+i*35} y2="180" strokeWidth="0.4"/>)}
+        {[[0,0],[1,2],[2,1],[3,3],[4,0],[1,4],[3,1],[0,3],[2,3],[4,2]].map(([c,r],i)=>
+          <rect key={i} x={31+c*35} y={61+r*30} width={34} height={29} fill="#5b4a2a" opacity="0.35"/>)}
+        <polygon points="100,195 115,215 85,215" fill="#5b4a2a" opacity="0.5"/>
+      </g>
+    </svg>,
+    <svg viewBox="0 0 200 240" key="5">
+      <g stroke="#5b4a2a" strokeWidth="0.7" fill="none">
+        <polygon points="100,30 170,120 140,210 60,210 30,120" />
+        <line x1="100" y1="30" x2="100" y2="210" strokeWidth="0.4"/><line x1="30" y1="120" x2="170" y2="120" strokeWidth="0.4"/>
+        <line x1="170" y1="120" x2="60" y2="210" strokeWidth="0.4"/><line x1="30" y1="120" x2="140" y2="210" strokeWidth="0.4"/>
+        {[[100,30],[170,120],[140,210],[60,210],[30,120]].map(([x,y],i)=>
+          <circle key={i} cx={x} cy={y} r="4" fill="#5b4a2a"/>)}
+        {[[100,93],[69,117],[81,152],[119,152],[131,117]].map(([x,y],i)=>
+          <circle key={i} cx={x} cy={y} r="2.5" fill="#5b4a2a" opacity="0.6"/>)}
+      </g>
+    </svg>,
   ];
+
+  const [difficulty, setDifficulty] = _uS_s('normal');
+  const DIFF_LABELS = { ru: { easy:'Легко', normal:'Нормально', hard:'Сложно' }, en: { easy:'Easy', normal:'Normal', hard:'Hard' } };
+  const diffLabels = DIFF_LABELS[lang] || DIFF_LABELS.ru;
 
   const LEVELS_PER_PAGE = 6;
   const doneLevels = chapterLevels[chapterIdx] || 0;
@@ -227,7 +253,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
         <div style={{ flex:1, position:'relative', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-between', padding:'18px 8px' }}>
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, rgba(212,175,55,0.04), transparent 60%)', borderRadius:4 }} />
           <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:4, color:'rgba(212,175,55,0.7)', position:'relative' }}>
-            {['I','II','III','IV'][chapterIdx] || 'I'}
+            {['I','II','III','IV','V','VI'][chapterIdx] || 'I'}
           </div>
           <div style={{ width:'100%', flex:1, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
             {React.cloneElement(engravings[chapterIdx], { width:'100%', height:'auto', style:{ opacity:0.85, filter:'drop-shadow(0 0 6px rgba(212,175,55,0.18))' } })}
@@ -329,7 +355,6 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
               {[[14,22],[90,12],[148,30],[28,58],[122,50],[68,40],[154,78],[10,96],[104,88],[48,120],[138,112],[24,150],[155,148],[78,168],[112,185],[36,210],[150,215],[16,242],[98,234],[132,255],[52,272],[158,268],[82,298],[18,310],[148,302]].map(([x,y],i)=>(
                 <circle key={i} cx={x} cy={y} r={i%3===0?1.4:0.9} fill="#E5C158" opacity={i%4===0?0.32:0.18} />
               ))}
-              {/* Фоновое созвездие */}
               <g stroke="#D4AF37" strokeWidth="0.5" opacity="0.13">
                 <line x1="25" y1="60" x2="65" y2="90" /><line x1="65" y1="90" x2="120" y2="65" />
                 <line x1="120" y1="65" x2="148" y2="130" /><line x1="148" y1="130" x2="95" y2="170" />
@@ -348,7 +373,64 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
                   fill="#E5C158" opacity="0.15" style={{userSelect:'none'}}>{v}</text>
               ))}
             </svg>,
-          ][chapterIdx]}
+
+            // Глава 4 — Магические звёзды: пятиконечная звезда с числами
+            <svg key="bg4" style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}
+              viewBox="0 0 160 320" preserveAspectRatio="xMidYMid slice">
+              {[[14,22],[90,12],[148,30],[28,58],[122,50],[68,40],[154,78],[10,96],[104,88],[48,120],[138,112],[24,150],[155,148],[78,168],[112,185],[36,210],[150,215],[16,242],[98,234],[132,255],[52,272],[158,268],[82,298],[18,310],[148,302]].map(([x,y],i)=>(
+                <circle key={i} cx={x} cy={y} r={i%3===0?1.2:0.8} fill="#E5C158" opacity={i%4===0?0.28:0.16} />
+              ))}
+              {/* Пятиконечная звезда */}
+              <g stroke="#D4AF37" strokeWidth="0.55" fill="none" opacity="0.13" transform="translate(80,110)">
+                <polygon points="0,-58 17,-18 60,-18 26,10 38,52 0,26 -38,52 -26,10 -60,-18 -17,-18" />
+                <circle cx="0" cy="-58" r="4" fill="#D4AF37" opacity="0.3"/>
+                <circle cx="60" cy="-18" r="4" fill="#D4AF37" opacity="0.3"/>
+                <circle cx="38" cy="52" r="4" fill="#D4AF37" opacity="0.3"/>
+                <circle cx="-38" cy="52" r="4" fill="#D4AF37" opacity="0.3"/>
+                <circle cx="-60" cy="-18" r="4" fill="#D4AF37" opacity="0.3"/>
+              </g>
+              <g stroke="#D4AF37" strokeWidth="0.4" fill="none" opacity="0.09" transform="translate(80,230) scale(0.65)">
+                <polygon points="0,-58 17,-18 60,-18 26,10 38,52 0,26 -38,52 -26,10 -60,-18 -17,-18" />
+              </g>
+              {[['✦',14,180],['✦',148,185],['✦',80,310]].map(([v,x,y],i)=>(
+                <text key={i} x={x} y={y} textAnchor="middle" fontFamily="Cinzel, serif" fontSize="14"
+                  fill="#D4AF37" opacity="0.12" style={{userSelect:'none'}}>{v}</text>
+              ))}
+            </svg>,
+
+            // Глава 5 — Хитори: клетки с числами, зачёркнутые
+            <svg key="bg5" style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}
+              viewBox="0 0 160 320" preserveAspectRatio="xMidYMid slice">
+              {[[14,22],[90,12],[148,30],[28,58],[122,50],[68,40],[154,78],[10,96],[104,88],[48,120],[138,112],[24,150],[155,148],[78,168],[112,185],[36,210],[150,215],[16,242],[98,234],[132,255],[52,272],[158,268],[82,298],[18,310],[148,302]].map(([x,y],i)=>(
+                <circle key={i} cx={x} cy={y} r={i%3===0?1.2:0.8} fill="#E5C158" opacity={i%4===0?0.28:0.16} />
+              ))}
+              {/* Сетка хитори */}
+              <g stroke="#D4AF37" strokeWidth="0.45" fill="none" opacity="0.12">
+                <rect x="18" y="50" width="124" height="100" />
+                {[0,1,2,3].map(i=><line key={`h${i}`} x1="18" y1={75+i*25} x2="142" y2={75+i*25} strokeWidth="0.3"/>)}
+                {[0,1,2,3,4].map(i=><line key={`v${i}`} x1={18+i*25} y1="50" x2={18+i*25} y2="150" strokeWidth="0.3"/>)}
+              </g>
+              {/* Зачёркнутые клетки */}
+              {[[19,51],[69,101],[119,51],[44,126]].map(([x,y],i)=>(
+                <g key={i} opacity="0.18">
+                  <rect x={x} y={y} width="24" height="24" fill="#D4AF37"/>
+                  <line x1={x+3} y1={y+3} x2={x+21} y2={y+21} stroke="#000" strokeWidth="1"/>
+                  <line x1={x+21} y1={y+3} x2={x+3} y2={y+21} stroke="#000" strokeWidth="1"/>
+                </g>
+              ))}
+              {/* Числа */}
+              {[['3',30,70],['2',55,70],['1',80,70],['3',105,70],['2',130,70],
+                ['1',30,95],['3',55,95],['2',80,95],['1',105,95],['4',130,95]].map(([v,x,y],i)=>(
+                <text key={i} x={x} y={y} textAnchor="middle" fontFamily="Cinzel, serif" fontSize="13"
+                  fill="#D4AF37" opacity="0.13" style={{userSelect:'none'}}>{v}</text>
+              ))}
+              <g stroke="#D4AF37" strokeWidth="0.4" opacity="0.09">
+                <rect x="30" y="190" width="100" height="80" />
+                {[0,1,2,3].map(i=><line key={`h2${i}`} x1="30" y1={210+i*20} x2="130" y2={210+i*20} strokeWidth="0.3"/>)}
+                {[0,1,2,3,4].map(i=><line key={`v2${i}`} x1={30+i*25} y1="190" x2={30+i*25} y2="270" strokeWidth="0.3"/>)}
+              </g>
+            </svg>,
+          ][chapterIdx] || null}
 
           <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:4, color:'rgba(212,175,55,0.7)', position:'relative' }}>{t('levels').toUpperCase()}</div>
 
@@ -381,7 +463,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
                 const isLocked = globalIdx > doneLevels;
                 return (
                   <g key={i} style={{ cursor: !isLocked ? 'pointer' : 'default' }}
-                    onClick={e => { e.stopPropagation(); !isLocked && onPickLevel(chapterIdx, levelNum); }}>
+                    onClick={e => { e.stopPropagation(); !isLocked && onPickLevel(chapterIdx, levelNum, difficulty); }}>
                     <circle cx={p.x} cy={p.y} r="16" fill="transparent" />
                     {isCurrent && (
                       <circle cx={p.x} cy={p.y} r="11" fill="none" stroke={paletteAccent} strokeWidth="0.8" opacity="0.5">
@@ -419,9 +501,26 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
         </div>
       </div>
 
+      {/* Выбор сложности — только для глав II–VI */}
+      {chapterIdx > 0 && (
+        <div style={{ position:'absolute', bottom: 142, left:0, right:0, display:'flex', justifyContent:'center', gap:8, zIndex:5 }}>
+          {['easy','normal','hard'].map(d => (
+            <button key={d} className="btn-reset" onClick={() => setDifficulty(d)} style={{
+              padding:'6px 14px', borderRadius:999,
+              border:`1px solid ${difficulty === d ? paletteAccent : 'rgba(212,175,55,0.3)'}`,
+              background: difficulty === d ? `${paletteAccent}18` : 'transparent',
+              fontFamily:'Cinzel, serif', fontSize:9, letterSpacing:2,
+              color: difficulty === d ? paletteAccent : 'rgba(212,175,55,0.55)',
+              textTransform:'uppercase',
+              boxShadow: difficulty === d ? `0 0 8px ${paletteAccent}44` : 'none',
+            }}>{diffLabels[d]}</button>
+          ))}
+        </div>
+      )}
+
       {/* Primary CTA */}
-      <div style={{ position:'absolute', bottom: 110, left:0, right:0, display:'flex', justifyContent:'center', zIndex:5 }}>
-        <button className="btn-reset" onClick={() => onPickLevel(chapterIdx, nextLevel)} style={{
+      <div style={{ position:'absolute', bottom: 78, left:0, right:0, display:'flex', justifyContent:'center', zIndex:5 }}>
+        <button className="btn-reset" onClick={() => onPickLevel(chapterIdx, nextLevel, difficulty)} style={{
           display:'flex', alignItems:'center', gap:14,
           padding:'12px 26px', borderRadius:999,
           background:'radial-gradient(circle at 30% 30%, rgba(77,238,234,0.18), rgba(11,16,29,0.55) 70%)',
@@ -441,7 +540,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
       </div>
 
       {/* Chapter pager */}
-      <div style={{ position:'absolute', bottom: 60, left:0, right:0, display:'flex', alignItems:'center', justifyContent:'center', gap:18, zIndex:5 }}>
+      <div style={{ position:'absolute', bottom: 28, left:0, right:0, display:'flex', alignItems:'center', justifyContent:'center', gap:18, zIndex:5 }}>
         <button className="btn-reset" onClick={() => setChapterIdx(Math.max(0, chapterIdx - 1))}>
           <Icon kind="back" size={20} color={chapterIdx === 0 ? 'rgba(212,175,55,0.25)' : '#E5C158'} />
         </button>
@@ -474,9 +573,9 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
 }
 
 // ─────────────────────────── SKY COLLECTION (global — all chapters)
-function SkyCollection({ chapters, chapterLevels = [0,0,0,0], paletteAccent, onClose }) {
+function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, onClose }) {
   const LEVELS_PER_PAGE = 6;
-  const chapterRomanNums = ['I', 'II', 'III', 'IV'];
+  const chapterRomanNums = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
   // Собираем все завершённые созвездия по всем главам
   const allGroups = chapters.map((chapterName, ci) => {
@@ -700,6 +799,73 @@ function WinOverlay({ onContinue, onChapters, lang, paletteAccent }) {
 }
 
 // ─────────────────────────── HINT (modal)
+// ─────────────────────────── CHAPTER INFO MODAL (правила + сложность для глав II–VI)
+const CHAPTER_RULES = {
+  ru: [
+    null, // глава I — используется обычный HintModal
+    'Расставьте числа 1–9 в сетку 3×3 так, чтобы сумма по каждой строке, каждому столбцу и обеим диагоналям равнялась 15. Числа в лотке внизу — ваши инструменты.',
+    'Найдите все безопасные звёзды, не задев тёмные. Тап — открыть клетку. Долгое нажатие — поставить метку ✦ (звезда), ещё раз — знак ?, ещё раз — снять метку.',
+    'Закрасьте клетки по числовым подсказкам рядом с каждой строкой и столбцом. Число означает сколько клеток закрашено подряд в этом ряду. Несколько чисел — несколько групп, между ними хотя бы одна пустая.',
+    'Расставьте числа 1–10 в узлы пятиконечной звезды так, чтобы сумма по каждому лучу (4 узла) равнялась 22. Нажмите на число в банке, затем на узел звезды.',
+    'Зачеркните некоторые числа по правилам: в каждой строке и столбце не должно быть двух одинаковых незачёркнутых чисел; зачёркнутые клетки не должны касаться друг друга по горизонтали или вертикали.',
+  ],
+  en: [
+    null,
+    'Place numbers 1–9 in the 3×3 grid so that every row, column and both diagonals sum to 15. The tiles in the tray below are your tools.',
+    'Find all safe stars without hitting dark ones. Tap to reveal. Long-press to mark ✦, again for ?, again to clear.',
+    'Fill cells following the number clues beside each row and column. A number means that many consecutive filled cells. Multiple numbers mean multiple groups with at least one gap between.',
+    'Place numbers 1–10 in the star nodes so each ray of 4 nodes sums to 22. Tap a number in the bank, then tap a node to place it.',
+    'Cross out numbers so that: no row or column has two identical uncrossed numbers; crossed cells do not touch each other horizontally or vertically.',
+  ],
+};
+
+const DIFFICULTY_LABELS = {
+  ru: { easy: 'Лёгкая', normal: 'Нормальная', hard: 'Сложная' },
+  en: { easy: 'Easy', normal: 'Normal', hard: 'Hard' },
+};
+
+function ChapterInfoModal({ onClose, lang, paletteAccent, chapterIdx }) {
+  const rules = (CHAPTER_RULES[lang] || CHAPTER_RULES.ru)[chapterIdx];
+  const t = useT(lang);
+
+  return (
+    <div style={{ position:'absolute', inset:0, zIndex:40,
+      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+      background:'rgba(6,8,15,0.82)', backdropFilter:'blur(10px)' }}>
+      <div style={{
+        position:'relative', width: 310,
+        background: 'linear-gradient(180deg, #1a1f30 0%, #0d1220 100%)',
+        border:'1px solid rgba(212,175,55,0.55)',
+        borderRadius: 14,
+        boxShadow:'0 30px 60px rgba(0,0,0,0.7), 0 0 30px rgba(212,175,55,0.15)',
+        padding: '28px 22px 24px',
+        textAlign:'center',
+      }}>
+        <button onClick={onClose} className="btn-reset" style={{ position:'absolute', top:12, right:12 }}>
+          <Icon kind="close" size={18} />
+        </button>
+        <div style={{ display:'flex', justifyContent:'center', marginBottom:12, filter:'drop-shadow(0 0 10px rgba(255,210,90,0.5))' }}>
+          <Candle size={32} />
+        </div>
+        <div style={{ fontFamily:'Cinzel, serif', fontWeight:500, fontSize:13, letterSpacing:4, color:'#E5C158', textTransform:'uppercase', marginBottom:14 }}>
+          {t('hintTitle')}
+        </div>
+        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:15, color:'rgba(255,243,184,0.88)', lineHeight:1.55, textAlign:'left', marginBottom:24 }}>
+          {rules}
+        </div>
+        <button onClick={onClose} className="btn-reset" style={{
+          padding:'11px 32px', borderRadius:999,
+          border:'1px solid rgba(212,175,55,0.6)',
+          background:'rgba(212,175,55,0.08)',
+          fontFamily:'Cinzel, serif', letterSpacing:3, fontSize:12,
+          color:'#E5C158', textTransform:'uppercase',
+          boxShadow:'0 0 16px rgba(212,175,55,0.15)',
+        }}>{t('understood') || 'Понятно'}</button>
+      </div>
+    </div>
+  );
+}
+
 function HintModal({ onClose, lang, paletteAccent, hintText }) {
   const t = useT(lang);
   return (
@@ -1001,4 +1167,4 @@ function LoadingScreen({ onDone, lang = 'ru', paletteAccent = '#4DEEEA', duratio
   );
 }
 
-Object.assign(window, { CoverScreen, ChapterSelect, WinOverlay, HintModal, SettingsScreen, LoadingScreen, SkyCollection });
+Object.assign(window, { CoverScreen, ChapterSelect, WinOverlay, HintModal, ChapterInfoModal, SettingsScreen, LoadingScreen, SkyCollection });

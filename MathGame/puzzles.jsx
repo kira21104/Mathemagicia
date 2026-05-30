@@ -328,11 +328,11 @@ function msrXr(seed) {
   return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
 }
 
-function msrMineCount(levelIdx) {
-  if (levelIdx <= 5)  return 18;
-  if (levelIdx <= 15) return 24;
-  if (levelIdx <= 30) return 30;
-  return 36;
+function msrMineCount(levelIdx, difficulty = 'normal') {
+  const base = levelIdx <= 5 ? 18 : levelIdx <= 15 ? 24 : levelIdx <= 30 ? 30 : 36;
+  if (difficulty === 'easy') return Math.max(10, base - 8);
+  if (difficulty === 'hard') return Math.min(50, base + 10);
+  return base;
 }
 
 function msrPlaceMines(firstIdx, total, count, rng) {
@@ -355,9 +355,9 @@ function msrNeighbours(idx, cols, total) {
   return nb;
 }
 
-function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1 }) {
+function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal' }) {
   const COLS = 12, ROWS = 12, TOTAL = COLS * ROWS;
-  const MINES = msrMineCount(levelIdx);
+  const MINES = msrMineCount(levelIdx, difficulty);
 
   // SVG layout: сетка центрирована в viewBox 420×580
   const CELL = 35;

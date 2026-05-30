@@ -2,7 +2,7 @@
 
 const { useState: _uS_p, useEffect: _uE_p, useRef: _uR_p } = React;
 
-function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, paletteAccent }) {
+function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, paletteAccent, difficulty = 'normal' }) {
   const t = useT(lang);
   const [hint, setHint] = _uS_p(false);
   const [hintText, setHintText] = _uS_p(null);
@@ -16,17 +16,21 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
       'Проведи цепочку через узлы — сумма чисел должна равняться цели.',
       'Расставьте числа так, чтобы сумма по строкам, столбцам и диагоналям равнялась 15.',
       'Раскройте тьму — найдите все безопасные звёзды. Удержите, чтобы отметить опасную.',
-      'Соедините звёзды по порядку и проявите созвездие.',
+      'Закрасьте клетки по подсказкам — проявите скрытый рисунок.',
+      'Расставьте числа в узлы звезды — суммы по всем лучам должны совпасть.',
+      'Зачеркните числа — без повторов в ряду, зачёркнутые не касаются друг друга.',
     ],
     en: [
       'Draw a chain through the nodes — the sum must equal the target.',
       'Place the numbers so every row, column and diagonal sums to 15.',
       'Unveil the darkness — find all safe stars. Hold to mark a dangerous one.',
-      'Connect the stars in order to reveal the constellation.',
+      'Fill the cells by the clues — reveal the hidden image.',
+      'Place numbers in the star — all line sums must be equal.',
+      'Cross out numbers — no repeats in a line, crossed cells must not touch.',
     ],
   };
   const taskText = (tasks[lang] || tasks.ru)[chapterIdx] || (tasks.ru[0]);
-  const PuzzleByChapter = [GraphPuzzle, MagicSquarePuzzle, ShapesPuzzle, ConstellationPuzzle];
+  const PuzzleByChapter = [GraphPuzzle, MagicSquarePuzzle, ShapesPuzzle, NonogramPuzzle, MagicStarsPuzzle, HitoriPuzzle];
   const Puzzle = PuzzleByChapter[chapterIdx] || GraphPuzzle;
 
   const handleWin = () => {
@@ -47,7 +51,7 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
           <div style={{
             fontFamily:'Cinzel, serif', fontSize:13, letterSpacing:4, color:'#E5C158',
             textTransform:'uppercase',
-          }}>{t('chapter')} {['I','II','III','IV'][chapterIdx] || 'I'}</div>
+          }}>{t('chapter')} {['I','II','III','IV','V','VI'][chapterIdx] || 'I'}</div>
           <div style={{
             fontFamily:'Comfortaa, sans-serif', fontSize:10, letterSpacing:5,
             color:'rgba(229,193,88,0.65)', marginTop:3,
@@ -110,7 +114,8 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
 
         {/* Inner velvet vignette */}
         <div style={{ position:'absolute', inset:14 }}>
-          <Puzzle key={resetKey} onWin={handleWin} paletteAccent={paletteAccent} levelIdx={levelIdx}
+          <Puzzle key={`${resetKey}-${difficulty}`} onWin={handleWin} paletteAccent={paletteAccent} levelIdx={levelIdx}
+            difficulty={difficulty}
             onSumChange={chapterIdx === 0 ? (sum, target) => setSumInfo({ sum, target }) : undefined}
             onHint={chapterIdx === 0 ? (h) => setHintText(h) : undefined} />
         </div>
@@ -132,7 +137,9 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
         </button>
       </div>
 
-      {hint && <HintModal onClose={() => setHint(false)} lang={lang} paletteAccent={paletteAccent} hintText={hintText} />}
+      {hint && chapterIdx === 0 && <HintModal onClose={() => setHint(false)} lang={lang} paletteAccent={paletteAccent} hintText={hintText} />}
+      {hint && chapterIdx > 0 && <ChapterInfoModal onClose={() => setHint(false)} lang={lang} paletteAccent={paletteAccent}
+        chapterIdx={chapterIdx} />}
       {solved && <WinOverlay
         onContinue={onWin}
         onChapters={onChapters}
@@ -150,7 +157,8 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
   const [paletteAccent, setPaletteAccent] = _uS_p(paletteAccentOverride || '#4DEEEA');
   const [theme, setTheme] = _uS_p(variant);
   // Счётчик пройденных уровней по каждой главе (0 = не начата)
-  const [chapterLevels, setChapterLevels] = _uS_p([0, 0, 0, 0]);
+  const [chapterLevels, setChapterLevels] = _uS_p([0, 0, 0, 0, 0, 0]);
+  const [difficulty, setDifficulty] = _uS_p('normal');
   // Тёмная накладка поверх всего — независима от смены экрана
   const [coverBlack, setCoverBlack] = _uS_p(false);
 
@@ -200,7 +208,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
       lang={lang} setLang={setLang} paletteAccent={paletteAccent} />;
   } else if (screen === 'chapters') {
     body = <ChapterSelect onBack={() => setScreen('cover')}
-      onPickLevel={(c) => { setChapter(c); setScreen('game'); }}
+      onPickLevel={(c, _lvl, diff) => { setChapter(c); if (diff) setDifficulty(diff); setScreen('game'); }}
       lang={lang} paletteAccent={paletteAccent} chapterLevels={chapterLevels}
       initialChapterIdx={chapter} />;
   } else if (screen === 'game') {
@@ -209,7 +217,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
       onBack={() => goTo('chapters')}
       onWin={() => handleWinContinue(chapter)}
       onChapters={() => handleWinChapters(chapter)}
-      lang={lang} paletteAccent={paletteAccent} />;
+      lang={lang} paletteAccent={paletteAccent} difficulty={difficulty} />;
   } else if (screen === 'settings') {
     body = <SettingsScreen onBack={() => setScreen('cover')}
       lang={lang} setLang={setLang}
