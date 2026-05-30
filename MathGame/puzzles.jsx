@@ -126,14 +126,17 @@ function GraphPuzzle({ onWin, onSumChange, onHint, paletteAccent = '#4DEEEA', le
       if (!allowedSet.has(key)) {
         // Ребро не существует в графе
         setError(key);
+        SFX && SFX.error(); VIB && VIB.error();
         setTimeout(() => setError(null), 600);
       } else if (chain.includes(target.id)) {
         // Уже в цепочке — ошибка
         setError(key);
+        SFX && SFX.error(); VIB && VIB.error();
         setTimeout(() => setError(null), 600);
       } else if (!canAppend(target.id)) {
         // Не продолжение цепочки
         setError(key);
+        SFX && SFX.error(); VIB && VIB.error();
         setTimeout(() => setError(null), 600);
       } else {
         // Добавляем узел в цепочку
@@ -149,14 +152,17 @@ function GraphPuzzle({ onWin, onSumChange, onHint, paletteAccent = '#4DEEEA', le
         if (newSum > TARGET) {
           // Перебор — сброс
           setError(key);
+          SFX && SFX.error(); VIB && VIB.error();
           setTimeout(() => {
             setError(null);
             setChain([]);
           }, 600);
         } else {
           setChain(newChain);
+          SFX && SFX.tap(); VIB && VIB.tap();
           if (newSum === TARGET) {
             setSolved(true);
+            SFX && SFX.win(); VIB && VIB.win();
             setTimeout(() => onWin && onWin(), 1400);
           }
         }
@@ -410,9 +416,11 @@ function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
       setMines(minesSet);
       const newRevealed = floodReveal(idx, minesSet, new Set());
       setRevealed(newRevealed);
+      SFX && SFX.reveal(); VIB && VIB.reveal();
       // Победа сразу (бывает на маленьких полях)
       if (newRevealed.size === TOTAL - MINES) {
         setWon(true);
+        SFX && SFX.win(); VIB && VIB.win();
         setTimeout(() => onWin && onWin(), 1400);
       }
       return;
@@ -421,19 +429,23 @@ function ShapesPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     if (mines.has(idx)) {
       setRevealed(r => new Set([...r, idx]));
       setDead(true);
+      SFX && SFX.boom(); VIB && VIB.boom();
       return;
     }
 
     const newRevealed = floodReveal(idx, mines, revealed);
     setRevealed(newRevealed);
+    SFX && SFX.reveal(); VIB && VIB.reveal();
     if (newRevealed.size === TOTAL - MINES) {
       setWon(true);
+      SFX && SFX.win(); VIB && VIB.win();
       setTimeout(() => onWin && onWin(), 1400);
     }
   };
 
   const toggleMark = (idx) => {
     if (dead || won || revealed.has(idx)) return;
+    SFX && SFX.tap(); VIB && VIB.tap();
     setMarks(m => {
       const next = new Map(m);
       const cur = next.get(idx);

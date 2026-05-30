@@ -5,6 +5,16 @@ const { useState: _uS_s, useEffect: _uE_s, useRef: _uR_s, useMemo: _uM_s } = Rea
 // ─────────────────────────── COVER (Main menu)
 function CoverScreen({ onOpen, onSettings, lang, setLang, paletteAccent }) {
   const t = useT(lang);
+  const [soundOn, setSoundOn] = _uS_s(() => localStorage.getItem('mg_sound') !== 'off');
+
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    localStorage.setItem('mg_sound', next ? 'on' : 'off');
+    localStorage.setItem('mg_music', next ? 'on' : 'off');
+    SFX && SFX.setEnabled(next);
+  };
+
   return (
     <div className="screen night-bg starfield" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-between', padding:'70px 28px 50px' }}>
       <GoldDust count={30} area={{ w: 380, h: 800 }} />
@@ -97,7 +107,10 @@ function CoverScreen({ onOpen, onSettings, lang, setLang, paletteAccent }) {
               border:'1px solid rgba(212,175,55,0.45)',
               fontFamily:'Cinzel, serif', fontWeight:500, fontSize:11, letterSpacing:1.5,
             }} aria-label="language">{lang === 'ru' ? 'EN' : 'RU'}</button>
-          <HudButton onClick={() => {}} label="sound"><Icon kind="sound" size={20} /></HudButton>
+          <HudButton onClick={toggleSound} label="sound">
+            <Icon kind={soundOn ? 'sound' : 'soundOff'} size={20}
+              color={soundOn ? 'rgba(229,193,88,0.85)' : 'rgba(229,193,88,0.3)'} />
+          </HudButton>
         </div>
       </div>
     </div>
@@ -573,6 +586,112 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
   );
 }
 
+// ─────────────────────────── CAROUSEL — горизонтальный свайп карточек созвездий одной главы
+function ChapterConstCarousel({ constellations, paletteAccent, lang, ci }) {
+  const [idx, setIdx] = _uS_s(0);
+  const total = constellations.length;
+  const touchStartX = _uR_s(null);
+
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const next = () => setIdx(i => Math.min(total - 1, i + 1));
+
+  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (dx < -40) next();
+    else if (dx > 40) prev();
+    touchStartX.current = null;
+  };
+
+  if (total === 0) return null;
+  const { pts, lines, ru, en, la, starsLit } = constellations[idx];
+
+  return (
+    <div style={{ userSelect:'none' }}
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+
+      {/* Карточка */}
+      <div style={{
+        display:'flex', flexDirection:'column', alignItems:'center',
+        background:'rgba(8,12,28,0.82)',
+        border:'1px solid rgba(212,175,55,0.25)',
+        borderRadius:12,
+        padding:'10px 10px 8px',
+        margin:'0 auto',
+        width: 200,
+        position:'relative',
+      }}>
+        {/* Стрелки — только если больше одной карточки */}
+        {total > 1 && (
+          <>
+            <button className="btn-reset" onClick={prev} disabled={idx === 0} style={{
+              position:'absolute', left:6, top:'50%', transform:'translateY(-50%)',
+              color: idx === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
+              fontSize:18, lineHeight:1,
+            }}>‹</button>
+            <button className="btn-reset" onClick={next} disabled={idx === total - 1} style={{
+              position:'absolute', right:6, top:'50%', transform:'translateY(-50%)',
+              color: idx === total - 1 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
+              fontSize:18, lineHeight:1,
+            }}>›</button>
+          </>
+        )}
+
+        <svg viewBox="0 0 160 200" width="140" height="120" style={{ overflow:'visible' }}>
+          <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
+            {(lines || []).map(([a, b], li) => {
+              const A = pts[a], B = pts[b];
+              if (!A || !B) return null;
+              return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
+            })}
+          </g>
+          {pts.map((p, si) => {
+            const lit = si < starsLit;
+            return (
+              <g key={si}>
+                {lit && <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />}
+                <circle cx={p.x} cy={p.y}
+                  r={lit ? 3.8 : 2}
+                  fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
+                  style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
+                />
+              </g>
+            );
+          })}
+        </svg>
+
+        <div style={{
+          fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
+          fontSize:13, color:'rgba(229,193,88,0.9)', textAlign:'center',
+          marginTop:4, lineHeight:1.25,
+        }}>{lang === 'en' ? (en || ru) : ru}</div>
+        {la && (
+          <div style={{
+            fontFamily:'Comfortaa, sans-serif', fontSize:8, letterSpacing:0.5,
+            color:'rgba(212,175,55,0.4)', marginTop:2, textAlign:'center',
+          }}>{la}</div>
+        )}
+
+        {/* Пагинация точками */}
+        {total > 1 && (
+          <div style={{ display:'flex', gap:5, marginTop:8 }}>
+            {Array.from({ length: total }, (_, i) => (
+              <button key={i} className="btn-reset" onClick={() => setIdx(i)} style={{
+                width: i === idx ? 14 : 6,
+                height: 6,
+                borderRadius: 3,
+                background: i === idx ? paletteAccent : 'rgba(212,175,55,0.25)',
+                transition: 'all 0.25s ease',
+              }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────── SKY COLLECTION (global — all chapters)
 function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, lang = 'ru', onClose }) {
   const t = useT(lang);
@@ -642,57 +761,8 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                 <div style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(212,175,55,0.3),transparent)' }} />
               </div>
 
-              {/* Карточки созвездий этой главы */}
-              <div style={{ display:'flex', flexWrap:'wrap', gap:10, justifyContent:'center' }}>
-                {constellations.map(({ pts, lines, ru, en, la, starsLit, pi }) => (
-                  <div key={`${ci}-${pi}`} style={{
-                    width: 134,
-                    background:'rgba(8,12,28,0.82)',
-                    border:'1px solid rgba(212,175,55,0.25)',
-                    borderRadius:10,
-                    padding:'8px 6px 7px',
-                    display:'flex', flexDirection:'column', alignItems:'center',
-                  }}>
-                    <svg viewBox="0 0 160 240" width="108" height="116" style={{ overflow:'visible' }}>
-                      {/* Линии */}
-                      <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
-                        {(lines || []).map(([a, b], li) => {
-                          const A = pts[a], B = pts[b];
-                          if (!A || !B) return null;
-                          return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
-                        })}
-                      </g>
-                      {/* Звёзды */}
-                      {pts.map((p, si) => {
-                        const lit = si < starsLit;
-                        return (
-                          <g key={si}>
-                            {lit && (
-                              <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />
-                            )}
-                            <circle cx={p.x} cy={p.y}
-                              r={lit ? 3.8 : 2}
-                              fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
-                              style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
-                            />
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div style={{
-                      fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-                      fontSize:11, color:'rgba(229,193,88,0.85)', textAlign:'center',
-                      marginTop:4, lineHeight:1.2,
-                    }}>{lang === 'en' ? (en || ru) : ru}</div>
-                    {la && (
-                      <div style={{
-                        fontFamily:'Comfortaa, sans-serif', fontSize:7, letterSpacing:0.5,
-                        color:'rgba(212,175,55,0.38)', marginTop:1, textAlign:'center',
-                      }}>{la}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {/* Карточки созвездий этой главы — горизонтальный свайп */}
+              <ChapterConstCarousel constellations={constellations} paletteAccent={paletteAccent} lang={lang} ci={ci} />
             </div>
           ))
         )}
@@ -943,9 +1013,13 @@ function HintModal({ onClose, lang, paletteAccent, hintText }) {
 // ─────────────────────────── SETTINGS
 function SettingsScreen({ onBack, lang, setLang, paletteAccent, setPaletteAccent, theme, setTheme }) {
   const t = useT(lang);
-  const [sound, setSound] = _uS_s(true);
-  const [music, setMusic] = _uS_s(true);
-  const [haptics, setHaptics] = _uS_s(true);
+  const [sound, setSound] = _uS_s(() => localStorage.getItem('mg_sound') !== 'off');
+  const [music, setMusic] = _uS_s(() => localStorage.getItem('mg_music') !== 'off');
+  const [haptics, setHaptics] = _uS_s(() => localStorage.getItem('mg_haptics') !== 'off');
+
+  _uE_s(() => { localStorage.setItem('mg_sound', sound ? 'on' : 'off'); SFX && SFX.setEnabled(sound); }, [sound]);
+  _uE_s(() => { localStorage.setItem('mg_music', music ? 'on' : 'off'); }, [music]);
+  _uE_s(() => { localStorage.setItem('mg_haptics', haptics ? 'on' : 'off'); VIB && VIB.setEnabled(haptics); }, [haptics]);
 
   const Row = ({ label, right, last }) => (
     <div style={{

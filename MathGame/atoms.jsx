@@ -157,6 +157,7 @@ function Icon({ kind, size = 22, color = '#E5C158' }) {
     chevR: <path d="M9 5L16 12L9 19" {...props} />,
     settings: <g {...props}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></g>,
     sound: <g {...props}><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 8c1.5 1.2 1.5 6.8 0 8" /><path d="M19 5c3 2.5 3 11.5 0 14" /></g>,
+    soundOff: <g {...props}><path d="M4 9v6h4l5 4V5L8 9H4z" /><line x1="23" y1="5" x2="17" y2="11" /><line x1="17" y1="5" x2="23" y2="11" /></g>,
     close: <g {...props}><path d="M6 6l12 12M18 6L6 18" /></g>,
     eye: <g {...props}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></g>,
     refresh: <g {...props}><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></g>,
@@ -266,4 +267,132 @@ function Constellation({ width = 220, height = 280, points }) {
   );
 }
 
-Object.assign(window, { useT, STRINGS, GoldDust, Candle, Icon, HudButton, CornerFlourish, Astrolabe, Rune, Constellation });
+// ─────────── Sound engine (Web Audio API)
+const SFX = (() => {
+  let ctx = null;
+  let enabled = true;
+
+  const getCtx = () => {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+
+  // Базовый строительный блок: один осциллятор с огибающей громкости
+  const tone = (freq, type, startTime, duration, gainPeak, fadeIn = 0.01, fadeOut = 0.08) => {
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + fadeIn);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration - fadeOut);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  };
+
+  return {
+    setEnabled(v) { enabled = v; },
+
+    // Лёгкий щелчок — тап по клетке / выбор числа
+    tap() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      tone(520, 'sine',     t,       0.10, 0.12, 0.005, 0.05);
+      tone(780, 'triangle', t,       0.06, 0.06, 0.005, 0.04);
+    },
+
+    // Размещение на место / закрашивание клетки
+    place() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      tone(440, 'sine',     t,       0.14, 0.15, 0.008, 0.06);
+      tone(660, 'sine',     t + 0.05, 0.10, 0.08, 0.005, 0.05);
+    },
+
+    // Ошибка — диссонанс
+    error() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      tone(220, 'sawtooth', t,       0.18, 0.18, 0.01, 0.12);
+      tone(233, 'sawtooth', t,       0.18, 0.12, 0.01, 0.12);
+    },
+
+    // Победа — восходящая арпеджио
+    win() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      // Ре мажор: D4 F#4 A4 D5 F#5
+      const notes = [293.66, 369.99, 440.00, 587.33, 739.99];
+      notes.forEach((freq, i) => {
+        tone(freq, 'sine', t + i * 0.13, 0.55 - i * 0.04, 0.18, 0.01, 0.25);
+      });
+      // Лёгкий блеск поверх
+      tone(1174.66, 'triangle', t + 0.60, 0.4, 0.07, 0.02, 0.35);
+    },
+
+    // Строка/столбец нонограммы решена — мягкий звон
+    lineOk() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      tone(880,  'sine', t,        0.22, 0.12, 0.005, 0.18);
+      tone(1108, 'sine', t + 0.04, 0.18, 0.08, 0.005, 0.14);
+    },
+
+    // Звезда открыта (сапёр) — мягкий "пинг"
+    reveal() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      tone(660, 'sine', t, 0.12, 0.10, 0.005, 0.08);
+    },
+
+    // Взрыв (мина) — грохот
+    boom() {
+      if (!enabled) return;
+      const c = getCtx(), t = c.currentTime;
+      // Низкий удар через noise-подобный буфер
+      const bufSize = c.sampleRate * 0.4;
+      const buf = c.createBuffer(1, bufSize, c.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const gain = c.createGain();
+      gain.gain.setValueAtTime(0.55, t);
+      gain.gain.linearRampToValueAtTime(0, t + 0.4);
+      src.connect(gain);
+      gain.connect(c.destination);
+      src.start(t);
+      // Низкий тон поверх
+      tone(80, 'sine', t, 0.35, 0.4, 0.01, 0.28);
+    },
+  };
+})();
+
+// ─────────── Haptics engine (Vibration API)
+const VIB = (() => {
+  let enabled = true;
+  const vib = (pattern) => {
+    if (!enabled || !navigator.vibrate) return;
+    navigator.vibrate(pattern);
+  };
+  return {
+    setEnabled(v) { enabled = v; },
+    tap()    { vib(8); },
+    place()  { vib([6, 30, 10]); },
+    error()  { vib([20, 40, 20]); },
+    win()    { vib([10, 40, 15, 40, 25]); },
+    lineOk() { vib([6, 20, 12]); },
+    reveal() { vib(5); },
+    boom()   { vib([40, 30, 40]); },
+  };
+})();
+
+// Восстанавливаем настройки из localStorage при загрузке
+SFX.setEnabled(localStorage.getItem('mg_sound') !== 'off');
+VIB.setEnabled(localStorage.getItem('mg_haptics') !== 'off');
+
+Object.assign(window, { useT, STRINGS, GoldDust, Candle, Icon, HudButton, CornerFlourish, Astrolabe, Rune, Constellation, SFX, VIB });

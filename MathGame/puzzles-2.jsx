@@ -121,6 +121,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
     const sums = [sumRow(0), sumRow(1), sumRow(2), sumCol(0), sumCol(1), sumCol(2), sumDiag(0), sumDiag(1)];
     if (sums.every(s => s === 15)) {
       setSolved(true);
+      SFX && SFX.win(); VIB && VIB.win();
       setTimeout(() => onWin && onWin(), 1400);
     }
   }, [pieces]);
@@ -138,6 +139,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
   const onPointerDown = (piece) => (e) => {
     if (solved) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    SFX && SFX.tap(); VIB && VIB.tap();
     const p = svgPt(e.clientX, e.clientY);
     dragRef.current = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
     setDragId(piece.id);
@@ -171,7 +173,13 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
       if (target) {
         const ctr = cellCenter(target.r, target.c);
         const correct = SOLUTION[target.r][target.c] === piece.value;
-        if (!correct) { setError(target); setTimeout(() => setError(null), 700); }
+        if (!correct) {
+          setError(target);
+          SFX && SFX.error(); VIB && VIB.error();
+          setTimeout(() => setError(null), 700);
+        } else {
+          SFX && SFX.place(); VIB && VIB.place();
+        }
         return ps.map(pc => pc.id === id ? { ...pc, x: ctr.x, y: ctr.y, placed: target } : pc);
       }
       return ps.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placed: null } : pc);
@@ -338,6 +346,7 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
   const dragMode = _uR_q(null); // { fill: 0|1|2 } — режим рисования текущего жеста
   const cellsRef = _uR_q(cells); // всегда свежий срез cells для pointer-обработчиков
   const svgRef = _uR_q(null);
+  const prevLineOkRef = _uR_q({ rows: Array(size).fill(false), cols: Array(size).fill(false) });
   cellsRef.current = cells;
 
   // Размеры SVG
@@ -356,6 +365,7 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
     });
     if (correct && !solved) {
       setSolved(true);
+      SFX && SFX.win(); VIB && VIB.win();
       setTimeout(() => onWin && onWin(), 1400);
     }
   }, [cells]);
@@ -393,6 +403,7 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
     // Цикл: пусто→закрашено→крест→пусто
     const next = cur === 0 ? 1 : cur === 1 ? 2 : 0;
     dragMode.current = { fill: next };
+    SFX && SFX.tap(); VIB && VIB.tap();
     applyCell(cell.r, cell.c, next);
   };
 
@@ -415,6 +426,23 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
     const line = Array.from({ length: size }, (_, r) => cells[cellIdx(r, c)] === 1 ? 1 : 0);
     return JSON.stringify(ngnClues(line)) === JSON.stringify(colClues[c]);
   };
+
+  // Звук при завершении строки/столбца
+  _uE_q(() => {
+    const prev = prevLineOkRef.current;
+    let fired = false;
+    for (let r = 0; r < size; r++) {
+      const ok = rowOk(r);
+      if (ok && !prev.rows[r]) fired = true;
+      prev.rows[r] = ok;
+    }
+    for (let c = 0; c < size; c++) {
+      const ok = colOk(c);
+      if (ok && !prev.cols[c]) fired = true;
+      prev.cols[c] = ok;
+    }
+    if (fired && !solved) SFX && SFX.lineOk(); VIB && VIB.lineOk();
+  }, [cells]);
 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%' }}>
@@ -530,6 +558,7 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) 
   _uE_q(() => {
     if (connected.length === NEXT) {
       setSolved(true);
+      SFX && SFX.win(); VIB && VIB.win();
       setTimeout(() => onWin && onWin(), 1500);
     }
   }, [connected]);
@@ -583,8 +612,10 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) 
       if (target.id === expected) {
         setEdges(e => [...e, { a: dragFrom.id, b: target.id }]);
         setConnected(c => [...c, target.id]);
+        SFX && SFX.tap(); VIB && VIB.tap();
       } else {
         setError(target.id);
+        SFX && SFX.error(); VIB && VIB.error();
         setTimeout(() => setError(null), 700);
       }
     }
@@ -820,6 +851,7 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
       const ok = MS_STAR_LINES.every(line => line.reduce((s, i) => s + placement[i], 0) === 22);
       if (ok && !solved) {
         setSolved(true);
+        SFX && SFX.win(); VIB && VIB.win();
         setTimeout(() => onWin && onWin(), 1400);
       }
     }
@@ -835,9 +867,11 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
         next[nodeIdx] = selected;
         return next;
       });
+      SFX && SFX.place(); VIB && VIB.place();
       setSelected(prev); // prev идёт обратно в "руку" (null если ячейка была пустой)
     } else if (placement[nodeIdx] !== null) {
       // Взять из узла
+      SFX && SFX.tap(); VIB && VIB.tap();
       setSelected(placement[nodeIdx]);
       setPlacement(p => { const next=[...p]; next[nodeIdx]=null; return next; });
     }
@@ -845,6 +879,7 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
 
   const handleBankClick = (num) => {
     if (solved) return;
+    SFX && SFX.tap(); VIB && VIB.tap();
     if (selected === num) { setSelected(null); return; }
     setSelected(num);
   };
@@ -1145,6 +1180,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     });
     if (correct && !solved) {
       setSolved(true);
+      SFX && SFX.win(); VIB && VIB.win();
       setTimeout(() => onWin && onWin(), 1400);
     }
   }, [cells]);
@@ -1177,6 +1213,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     const p = svgPt(e.clientX, e.clientY);
     const cell = ptToCell(p.x, p.y);
     if (!cell) return;
+    SFX && SFX.tap(); VIB && VIB.tap();
     const nextVal = cycleCell(cell.r, cell.c);
     dragModeRef.current = { fill: nextVal };
     setCells(prev => {
