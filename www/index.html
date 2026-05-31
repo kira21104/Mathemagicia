@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Mathemagicia</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
+    body {
+      background: #060912;
+      color: #ddd;
+      font-family: 'Comfortaa', system-ui, sans-serif;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+  </style>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="graph-gen.js"></script>
+  <script src="constellations-data.js"></script>
+  <script type="text/babel" src="atoms.jsx"></script>
+  <script type="text/babel" src="puzzles.jsx"></script>
+  <script type="text/babel" src="puzzles-2.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="prototype.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

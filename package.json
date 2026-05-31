@@ -1,0 +1,29 @@
+{
+  "name": "game_math",
+  "version": "1.0.0",
+  "description": "Мистическая математическая игра-головоломка для детей 6–10 лет в алхимическом стиле.",
+  "main": "index.js",
+  "scripts": {
+    "sync": "npx cap sync android",
+    "build": "npx cap sync android && cd android && gradlew assembleDebug",
+    "icons": "node generate-icons.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kira21104/Mathemagicia.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kira21104/Mathemagicia/issues"
+  },
+  "homepage": "https://github.com/kira21104/Mathemagicia#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "sharp": "^0.34.5"
+  }
+}
