@@ -1,0 +1,132 @@
+/* Mathemagicia — global tokens & shared styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Comfortaa:wght@300;400;500;600&family=Montserrat:wght@200;300;400;500&display=swap');
+
+:root {
+  --bg-night: #0B101D;
+  --bg-night-2: #131a2b;
+  --bg-emerald: #121812;
+  --bg-parchment: #f1e7cf;
+  --bg-parchment-ink: #2a2417;
+
+  --gold: #D4AF37;
+  --gold-bright: #E5C158;
+  --gold-deep: #8a6f1f;
+  --gold-faint: rgba(212, 175, 55, 0.35);
+
+  --cyan: #4DEEEA;
+  --mint: #70FFA0;
+  --coral: #FF6B6B;
+
+  --serif: 'Cinzel', 'Cormorant Garamond', serif;
+  --serif-book: 'Cormorant Garamond', 'Times New Roman', serif;
+  --sans: 'Comfortaa', 'Montserrat', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: #0a0a0e; font-family: var(--sans); color: #ddd; }
+
+/* Page (book paper) texture — generated with layered gradients */
+.paper-bg {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(212,175,55,0.06), transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(77,238,234,0.04), transparent 60%),
+    repeating-linear-gradient(115deg, rgba(244,228,188,0.018) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #f3e7c8 0%, #ead6a8 100%);
+}
+
+.paper-dark {
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(212,175,55,0.10), transparent 65%),
+    radial-gradient(ellipse at 70% 70%, rgba(77,238,234,0.05), transparent 60%),
+    repeating-linear-gradient(140deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 6px),
+    linear-gradient(160deg, #121812 0%, #0b101d 100%);
+}
+
+.night-bg {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(77,238,234,0.06), transparent 55%),
+    radial-gradient(ellipse at 20% 100%, rgba(212,175,55,0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(229,193,88,0.05), transparent 60%),
+    linear-gradient(180deg, #0B101D 0%, #060912 100%);
+}
+
+/* Subtle starfield via radial-gradient dots */
+.starfield::before {
+  content:'';
+  position:absolute; inset:0; pointer-events:none;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(229,193,88,0.7), transparent 60%),
+    radial-gradient(1px 1px at 84% 26%, rgba(229,193,88,0.55), transparent 60%),
+    radial-gradient(1px 1px at 22% 72%, rgba(255,255,255,0.4), transparent 60%),
+    radial-gradient(1px 1px at 67% 84%, rgba(229,193,88,0.6), transparent 60%),
+    radial-gradient(0.7px 0.7px at 45% 38%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(0.6px 0.6px at 78% 56%, rgba(229,193,88,0.4), transparent 60%),
+    radial-gradient(1.1px 1.1px at 30% 55%, rgba(229,193,88,0.5), transparent 60%),
+    radial-gradient(0.9px 0.9px at 92% 88%, rgba(255,255,255,0.45), transparent 60%),
+    radial-gradient(0.8px 0.8px at 8% 92%, rgba(229,193,88,0.4), transparent 60%);
+}
+
+/* Floating dust particles using CSS animation, applied to children */
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: var(--o, 0.7); }
+  50%  { transform: translate3d(8px, -18px, 0) scale(1.05); opacity: 1; }
+  100% { transform: translate3d(-6px, 6px, 0) scale(0.95); opacity: var(--o, 0.7); }
+}
+
+.dust { position: absolute; border-radius: 50%; background: radial-gradient(circle, #E5C158 0%, rgba(229,193,88,0.0) 70%); filter: blur(0.3px); animation: drift 7s ease-in-out infinite; pointer-events:none; }
+
+@keyframes pulseGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px var(--c, #4DEEEA)) drop-shadow(0 0 12px var(--c, #4DEEEA)); }
+  50%      { filter: drop-shadow(0 0 8px var(--c, #4DEEEA)) drop-shadow(0 0 22px var(--c, #4DEEEA)); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.gold-shimmer {
+  background: linear-gradient(90deg, #8a6f1f 0%, #D4AF37 35%, #fff3b8 50%, #D4AF37 65%, #8a6f1f 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+
+@keyframes flicker { 0%,100% { opacity: 1; } 50% { opacity: 0.78; } }
+.flicker { animation: flicker 2.6s ease-in-out infinite; }
+
+/* "Ink appears" — letters reveal left→right as if drawn by a golden quill */
+@keyframes inkReveal {
+  0%   { clip-path: inset(0 100% 0 0); filter: drop-shadow(0 0 0 transparent); }
+  60%  { filter: drop-shadow(0 0 6px rgba(229,193,88,0.45)); }
+  100% { clip-path: inset(0 0 0 0); filter: drop-shadow(0 0 8px rgba(229,193,88,0.3)); }
+}
+.ink-reveal {
+  animation: inkReveal 1.6s cubic-bezier(.55,.05,.25,1) both;
+}
+
+@keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes slowRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Engraved gold border */
+.gold-frame {
+  border: 1px solid rgba(212,175,55,0.55);
+  box-shadow: inset 0 0 0 1px rgba(212,175,55,0.15), inset 0 0 22px rgba(212,175,55,0.08);
+}
+
+/* Pretty thin gold double-line frame */
+.gold-double {
+  border: 1px solid rgba(212,175,55,0.7);
+  outline: 1px solid rgba(212,175,55,0.35);
+  outline-offset: 4px;
+}
+
+/* Soft cyan glow ring (HUD pills) */
+.cyan-glow { box-shadow: 0 0 0 1px rgba(77,238,234,0.4), 0 0 14px rgba(77,238,234,0.25); }
+
+/* No scrollbars inside iPhone */
+.screen { width: 100%; height: 100%; overflow: hidden; position: relative; }
+
+.btn-reset { background:none; border:none; color:inherit; font:inherit; padding:0; cursor:pointer; }
