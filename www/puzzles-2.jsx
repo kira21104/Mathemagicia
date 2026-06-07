@@ -100,8 +100,8 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
   const CELL   = size === 3 ? 72 : 56;
   const GRID_W = size * CELL;
   const GRID_X = Math.round((360 - GRID_W) / 2);
-  const GRID_Y = size === 3 ? 95 : 70;
-  const TRAY_Y = size === 3 ? 450 : 440;
+  const GRID_Y = size === 3 ? 140 : 138;
+  const TRAY_Y = size === 3 ? 418 : 424;
   const TILE_R = size === 3 ? 22 : 18;
   const SNAP_R = size === 3 ? 55 : 44;
 
@@ -397,11 +397,13 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
   }, [cells]);
 
   const svgPt = (clientX, clientY) => {
-    const rect = svgRef.current.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) * (W / rect.width),
-      y: (clientY - rect.top)  * (H / rect.height),
-    };
+    if (!svgRef.current) return { x: 0, y: 0 };
+    const pt = svgRef.current.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const r = pt.matrixTransform(ctm.inverse());
+    return { x: r.x, y: r.y };
   };
 
   const ptToCell = (x, y) => {
@@ -471,9 +473,10 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
   }, [cells]);
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%' }}>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
-        style={{ touchAction:'none', display:'block' }}
+    <div style={{ position:'relative', width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+        style={{ touchAction:'none', display:'block', width:'100%', height:'100%', maxWidth:`${W}px` }}
+        preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
         onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
 
@@ -768,9 +771,9 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) 
 
 // Узлы звезды: 5 внешних вершин (0–4) + 5 внутренних (5–9)
 // Линии по 4 узла каждая (5 линий лучей):
-// луч i: внешний[i] → внутренний[i] → внутренний[(i+2)%5] → внешний[(i+2+2)%5 ... на самом деле по рисунку]
-// Стандартная 5-лучевая звезда: 5 линий из 4 точек, сумма = 22
-// numbers 1–10, константа = 22 (5×22 = 110 = 2×55)
+// Геометрически верные линии пентаграммы: каждая линия проходит через
+// внешний узел, два последовательных внутренних и другой внешний узел
+// numbers 1–12 (выбираем 10), target = 24
 
 function msStarXr(seed) {
   let s = seed | 1;
@@ -793,25 +796,26 @@ function msStarNodes(cx, cy, R, r) {
   return nodes;
 }
 
-// 5 линий по 4 узла: [внешний_i, внутр_(i+1)%5+5, внутр_(i+3)%5+5, внешний_(i+2)%5]
-// (стандартная разбивка 5-звезды)
+// 5 геометрических линий: каждая идёт от внешнего через два внутренних к другому внешнему
+// Верифицировано: узлы лежат на одной прямой (коллинеарны)
 const MS_STAR_LINES = [
-  [0, 6, 8, 2],
-  [1, 7, 9, 3],
-  [2, 8, 5, 4],
-  [3, 9, 6, 0],
-  [4, 5, 7, 1],
+  [0, 5, 6, 2],
+  [1, 6, 7, 3],
+  [2, 7, 8, 4],
+  [3, 8, 9, 0],
+  [4, 9, 5, 1],
 ];
 
-// Базовое решение: arr=[2,4,6,8,10,1,9,7,5,3]
-// L0:2+9+5+6=22✓ L1:4+7+3+8=22✓ L2:6+5+1+10=22✓ L3:8+3+9+2=22✓ L4:10+1+7+4=22✓
-// Циклический сдвиг (ext и inn вместе) сохраняет все суммы.
-const MS_STAR_BASE_EXT = [2,4,6,8,10];
-const MS_STAR_BASE_INN = [1,9,7,5,3];
+// Базовое решение: числа 1-12 (10 из 12), target=24
+// ext=[1,2,3,4,5] inn=[8,12,6,10,9]
+// L0:1+8+12+3=24✓ L1:2+12+6+4=24✓ L2:3+6+10+5=24✓ L3:4+10+9+1=24✓ L4:5+9+8+2=24✓
+// Циклический сдвиг сохраняет все суммы = 24.
+const MS_STAR_BASE_EXT = [1,2,3,4,5];
+const MS_STAR_BASE_INN = [8,12,6,10,9];
 
 function msStarGenSolution(seed) {
   const rng = msStarXr(seed * 2311 + 99);
-  // Случайная ротация на 0-4 позиции — сохраняет все суммы = 22
+  // Случайная ротация на 0-4 позиции — сохраняет все суммы = 24
   const rot = Math.floor(rng() * 5);
   const ext = [...MS_STAR_BASE_EXT.slice(rot), ...MS_STAR_BASE_EXT.slice(0, rot)];
   const inn = [...MS_STAR_BASE_INN.slice(rot), ...MS_STAR_BASE_INN.slice(0, rot)];
@@ -819,62 +823,82 @@ function msStarGenSolution(seed) {
 }
 
 function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
-  const CX = 180, CY = 275, R = 150, r = 63;
-  const NODES = msStarNodes(CX, CY, R, r);
+  const CX = 180, CY = 260, R = 140, r_inner = 58;
+  const NODES = msStarNodes(CX, CY, R, r_inner);
   const svgRef = _uR_q(null);
+  const dragRef = _uR_q(null); // { id: pieceIdx, dx, dy }
 
-  // Генерируем решение по уровню
   const SOLUTION = _uM_q(() => msStarGenSolution(levelIdx * 1777), [levelIdx]);
 
-  // По сложности: easy — показываем больше подсказок
-  const hintCount = difficulty === 'easy' ? 5 : difficulty === 'hard' ? 1 : 3;
   const hintIndices = _uM_q(() => {
-    const rng = msStarXr(levelIdx * 3333 + 1);
-    const all = [0,1,2,3,4,5,6,7,8,9];
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
+    if (difficulty === 'easy') {
+      // Открываем все 5 внутренних + 2 случайных внешних
+      const rng = msStarXr(levelIdx * 3333 + 1);
+      const ext = [0,1,2,3,4];
+      for (let i = ext.length-1; i > 0; i--) {
+        const j = Math.floor(rng()*(i+1)); [ext[i],ext[j]]=[ext[j],ext[i]];
+      }
+      return new Set([5,6,7,8,9, ext[0], ext[1]]);
     }
-    return new Set(all.slice(0, hintCount));
+    if (difficulty === 'hard') {
+      // Только 2 внутренних узла — максимальная сложность
+      const rng = msStarXr(levelIdx * 3333 + 1);
+      const inn = [5,6,7,8,9];
+      for (let i = inn.length-1; i > 0; i--) {
+        const j = Math.floor(rng()*(i+1)); [inn[i],inn[j]]=[inn[j],inn[i]];
+      }
+      return new Set(inn.slice(0, 2));
+    }
+    // normal — все 5 внутренних узлов как подсказки, внешние 5 свободны
+    return new Set([5,6,7,8,9]);
   }, [levelIdx, difficulty]);
 
-  // Числа, которые нужно расставить (без подсказок)
-  const freeNums = _uM_q(() => {
+  // freeNums[i] = { value, origIdx } чтобы отслеживать каждую шайбу отдельно
+  const freeItems = _uM_q(() => {
     const rng = msStarXr(levelIdx * 5555 + 2);
-    const nums = SOLUTION.filter((_, i) => !hintIndices.has(i));
-    for (let i = nums.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [nums[i], nums[j]] = [nums[j], nums[i]];
+    const items = [];
+    SOLUTION.forEach((v, i) => { if (!hintIndices.has(i)) items.push({ value: v, origIdx: i }); });
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1)); [items[i],items[j]] = [items[j],items[i]];
     }
-    return nums;
+    return items;
   }, [SOLUTION, hintIndices]);
 
-  // Состояние: placement[nodeIdx] = число | null
-  const [placement, setPlacement] = _uS_q(() => {
+  const TRAY_Y = 478;
+  const traySpacing = Math.min(44, 300 / Math.max(freeItems.length, 1));
+  const trayStartX = 180 - (freeItems.length - 1) * traySpacing / 2;
+  const SNAP_R = 26;
+  const TILE_R = 18;
+
+  // pieces[i]: { id, value, x, y, home:{x,y}, placedNode: nodeIdx|null }
+  const initialPieces = freeItems.map((item, i) => ({
+    id: `s${i}`, value: item.value,
+    x: trayStartX + i * traySpacing, y: TRAY_Y,
+    home: { x: trayStartX + i * traySpacing, y: TRAY_Y },
+    placedNode: null,
+  }));
+
+  const [pieces, setPieces] = _uS_q(initialPieces);
+  const [dragId, setDragId] = _uS_q(null);
+  const [solved, setSolved] = _uS_q(false);
+  const [flash, setFlash] = _uS_q(null);
+
+  // placement из pieces для отрисовки и проверки
+  const placement = _uM_q(() => {
     const p = Array(10).fill(null);
     hintIndices.forEach(i => { p[i] = SOLUTION[i]; });
+    pieces.forEach(pc => { if (pc.placedNode !== null) p[pc.placedNode] = pc.value; });
     return p;
-  });
+  }, [pieces, hintIndices, SOLUTION]);
 
-  // Выбранный номер из банка (null = ничего)
-  const [selected, setSelected] = _uS_q(null);
-  const [solved, setSolved] = _uS_q(false);
-  const [flash, setFlash] = _uS_q(null); // nodeIdx мигает при ошибке
-
-  // Доступные числа (ещё не размещённые)
-  const placed = placement.filter((v, i) => v !== null && !hintIndices.has(i));
-  const available = freeNums.filter(n => !placed.includes(n));
-
-  // Суммы линий для отображения
   const lineSums = MS_STAR_LINES.map(line => ({
     sum: line.reduce((s, i) => s + (placement[i] || 0), 0),
     filled: line.every(i => placement[i] !== null),
   }));
 
-  // Победа
   _uE_q(() => {
     if (placement.every(v => v !== null)) {
-      const ok = MS_STAR_LINES.every(line => line.reduce((s, i) => s + placement[i], 0) === 22);
+      const ok = MS_STAR_LINES.every(line => line.reduce((s, i) => s + placement[i], 0) === 24);
       if (ok && !solved) {
         setSolved(true);
         SFX && SFX.win(); VIB && VIB.win();
@@ -883,58 +907,87 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
     }
   }, [placement]);
 
-  const handleNodeClick = (nodeIdx) => {
-    if (solved || hintIndices.has(nodeIdx)) return;
-    if (selected !== null) {
-      // Если в узле уже что-то есть — убираем обратно в банк
-      const prev = placement[nodeIdx];
-      setPlacement(p => {
-        const next = [...p];
-        next[nodeIdx] = selected;
-        return next;
-      });
-      SFX && SFX.place(); VIB && VIB.place();
-      setSelected(prev); // prev идёт обратно в "руку" (null если ячейка была пустой)
-    } else if (placement[nodeIdx] !== null) {
-      // Взять из узла
-      SFX && SFX.tap(); VIB && VIB.tap();
-      setSelected(placement[nodeIdx]);
-      setPlacement(p => { const next=[...p]; next[nodeIdx]=null; return next; });
-    }
+  const svgPt = (clientX, clientY) => {
+    const rect = svgRef.current.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) * (360 / rect.width),
+      y: (clientY - rect.top)  * (520 / rect.height),
+    };
   };
 
-  const handleBankClick = (num) => {
+  const onPointerDown = (piece) => (e) => {
     if (solved) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     SFX && SFX.tap(); VIB && VIB.tap();
-    if (selected === num) { setSelected(null); return; }
-    setSelected(num);
+    const p = svgPt(e.clientX, e.clientY);
+    dragRef.current = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
+    setDragId(piece.id);
+    setPieces(ps => ps.map(pc => pc.id === piece.id ? { ...pc, placedNode: null } : pc));
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    const p = svgPt(e.clientX, e.clientY);
+    const { id, dx, dy } = dragRef.current;
+    setPieces(ps => ps.map(pc => pc.id === id ? { ...pc, x: p.x - dx, y: p.y - dy } : pc));
+  };
+
+  const onPointerUp = (e) => {
+    if (!dragRef.current) return;
+    const p = svgPt(e.clientX, e.clientY);
+    const { id } = dragRef.current;
+    dragRef.current = null;
+    setDragId(null);
+    setPieces(ps => {
+      const piece = ps.find(pc => pc.id === id);
+      if (!piece) return ps;
+      // Найти ближайший свободный узел
+      let tgtNode = null, best = Infinity;
+      NODES.forEach((node, ni) => {
+        if (hintIndices.has(ni)) return;
+        if (ps.some(q => q.id !== id && q.placedNode === ni)) return;
+        const d = Math.hypot(node.x - p.x, node.y - p.y);
+        if (d < best && d < SNAP_R) { best = d; tgtNode = ni; }
+      });
+      if (tgtNode !== null) {
+        SFX && SFX.place(); VIB && VIB.place();
+        return ps.map(pc => pc.id === id
+          ? { ...pc, x: NODES[tgtNode].x, y: NODES[tgtNode].y, placedNode: tgtNode }
+          : pc);
+      }
+      // Вернуть домой
+      return ps.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placedNode: null } : pc);
+    });
   };
 
   return (
     <div style={{ position:'relative', width:'100%', height:'100%' }}>
       <svg ref={svgRef} viewBox="0 0 360 520" width="100%" height="100%"
-        style={{ touchAction:'none', display:'block' }}>
+        style={{ touchAction:'none', display:'block' }}
+        onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
 
-        {/* Заголовок */}
-        <text x="180" y="40" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
-          fontSize="13" fill="#D4AF37" letterSpacing="4">V · STELLA MAGICA</text>
+        <text x="180" y="38" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="500"
+          fontSize="13" fill="#D4AF37" letterSpacing="4">V · STELLA MAGICA · v4</text>
+        <text x="180" y="55" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="13"
+          fill="rgba(212,175,55,0.85)">
+          {solved ? '· Stella revelata ·' : lang === 'en' ? '· Every ray sums to 24 ·' : '· Каждый луч — сумма 24 ·'}
+        </text>
 
         {/* Декоративный фон */}
-        <g opacity="0.12" transform={`translate(${CX}, ${CY})`}>
-          <circle r="170" fill="none" stroke="#D4AF37" strokeWidth="0.5" strokeDasharray="1 4" />
-          <circle r="140" fill="none" stroke="#D4AF37" strokeWidth="0.4" />
+        <g opacity="0.1" transform={`translate(${CX}, ${CY})`}>
+          <circle r="160" fill="none" stroke="#D4AF37" strokeWidth="0.5" strokeDasharray="1 4" />
+          <circle r="130" fill="none" stroke="#D4AF37" strokeWidth="0.4" />
         </g>
 
-        {/* Линии лучей — подсветка */}
+        {/* Линии лучей */}
         {MS_STAR_LINES.map((line, li) => {
           const pts = line.map(i => NODES[i]);
           const sum = lineSums[li];
-          const ok = sum.filled && sum.sum === 22;
-          const over = sum.filled && sum.sum > 22;
+          const ok = sum.filled && sum.sum === 24;
+          const over = sum.filled && sum.sum > 24;
           const color = ok ? '#E5C158' : (over ? '#FF6B6B' : 'rgba(212,175,55,0.22)');
           return (
-            <line key={li}
-              x1={pts[0].x} y1={pts[0].y} x2={pts[3].x} y2={pts[3].y}
+            <line key={li} x1={pts[0].x} y1={pts[0].y} x2={pts[3].x} y2={pts[3].y}
               stroke={color} strokeWidth={ok ? 1.5 : 0.8}
               style={{ filter: ok ? 'drop-shadow(0 0 4px #E5C158)' : 'none' }} />
           );
@@ -947,7 +1000,6 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
           const pts = line.map(i => NODES[i]);
           const mx = (pts[0].x + pts[3].x) / 2;
           const my = (pts[0].y + pts[3].y) / 2;
-          // Смещаем метку перпендикулярно линии
           const dx = pts[3].x - pts[0].x, dy = pts[3].y - pts[0].y;
           const len = Math.hypot(dx, dy) || 1;
           const px = CX > mx ? -1 : 1;
@@ -956,89 +1008,68 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
             <text key={li}
               x={mx + (-dy/len) * 14 * px} y={my + (dx/len) * 14 * px + 4}
               textAnchor="middle" fontFamily="Comfortaa, sans-serif" fontSize="11"
-              fill={ok ? '#E5C158' : (sum.sum > 22 ? '#FF6B6B' : 'rgba(212,175,55,0.6)')}
+              fill={ok ? '#E5C158' : (sum.sum > 24 ? '#FF6B6B' : 'rgba(212,175,55,0.6)')}
               style={{ filter: ok ? 'drop-shadow(0 0 3px #E5C158)' : 'none' }}>
               {sum.sum}
             </text>
           );
         })}
 
-        {/* Узлы */}
+        {/* Узлы (подсказки + пустые слоты) */}
         {NODES.map((node, ni) => {
           const isHint = hintIndices.has(ni);
           const val = placement[ni];
-          const isSelected = !isHint && val === null && selected !== null;
+          const isEmpty = val === null;
           const isFlash = flash === ni;
           const col = solved ? '#E5C158' : (isHint ? '#D4AF37' : paletteAccent);
-          const R_NODE = 20;
           return (
-            <g key={ni} onClick={() => handleNodeClick(ni)} style={{ cursor: isHint ? 'default' : 'pointer' }}>
-              {/* Пульс на пустых узлах когда число выбрано */}
-              {isSelected && !val && (
-                <circle cx={node.x} cy={node.y} r={R_NODE + 6} fill="none"
-                  stroke={paletteAccent} strokeWidth="0.8" opacity="0.4">
-                  <animate attributeName="r" values={`${R_NODE+3};${R_NODE+9};${R_NODE+3}`} dur="1.4s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.4;0;0.4" dur="1.4s" repeatCount="indefinite"/>
-                </circle>
+            <g key={ni}>
+              {isEmpty && (
+                <circle cx={node.x} cy={node.y} r={TILE_R}
+                  fill="rgba(11,16,29,0.5)" stroke="rgba(212,175,55,0.3)"
+                  strokeWidth="1" strokeDasharray="3 3" />
               )}
-              <circle cx={node.x} cy={node.y} r={R_NODE}
-                fill="rgba(11,16,29,0.92)"
-                stroke={isFlash ? '#FF6B6B' : (isHint ? '#D4AF37' : (val ? col : 'rgba(212,175,55,0.4)'))}
-                strokeWidth={isHint ? 1.4 : 1.8}
-                style={{
-                  filter: isFlash ? 'drop-shadow(0 0 6px #FF6B6B)' :
-                    (val && !isHint ? `drop-shadow(0 0 5px ${col})` : 'none'),
-                }} />
-              {val && (
-                <text x={node.x} y={node.y + 6} textAnchor="middle"
-                  fontFamily="Cinzel, serif" fontWeight="600" fontSize="17"
-                  fill={isHint ? '#D4AF37' : (solved ? '#fff3b8' : '#fff')}>{val}</text>
+              {isHint && val && (
+                <g>
+                  <circle cx={node.x} cy={node.y} r={TILE_R}
+                    fill="rgba(11,16,29,0.92)" stroke="#D4AF37" strokeWidth="1.4"
+                    style={{ filter: 'drop-shadow(0 0 4px rgba(212,175,55,0.5))' }} />
+                  <text x={node.x} y={node.y + 6} textAnchor="middle"
+                    fontFamily="Cinzel, serif" fontWeight="600" fontSize="16"
+                    fill={solved ? '#fff3b8' : '#D4AF37'}>{val}</text>
+                </g>
               )}
             </g>
           );
         })}
 
-        {/* Выбранное число у пальца (показывается над банком) */}
-        {selected && (
-          <g transform={`translate(180, 472)`}>
-            <circle r="24" fill="rgba(11,16,29,0.92)" stroke={paletteAccent} strokeWidth="2"
-              style={{ filter: `drop-shadow(0 0 8px ${paletteAccent})` }} />
-            <text x="0" y="7" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="600" fontSize="19"
-              fill="#fff">{selected}</text>
-          </g>
-        )}
-
-        {/* Банк чисел */}
-        <text x="180" y="434" textAnchor="middle" fontFamily="Cinzel, serif"
+        {/* Лоток */}
+        <line x1="40" y1={TRAY_Y - 28} x2="320" y2={TRAY_Y - 28}
+          stroke="#D4AF37" strokeOpacity="0.3" strokeDasharray="1 3" strokeWidth="0.6" />
+        <text x="180" y={TRAY_Y - 34} textAnchor="middle" fontFamily="Cinzel, serif"
           fontSize="10" letterSpacing="3" fill="rgba(212,175,55,0.55)">·  NUMERI  ·</text>
-        {(() => {
-          const nums = freeNums;
-          const spacing = Math.min(42, 300 / Math.max(nums.length, 1));
-          const startX = 180 - (nums.length - 1) * spacing / 2;
-          return nums.map((n, i) => {
-            const isPlaced = !available.includes(n);
-            const isSel = selected === n;
-            return (
-              <g key={n} onClick={() => !isPlaced && handleBankClick(n)}
-                style={{ cursor: isPlaced ? 'default' : 'pointer', opacity: isPlaced ? 0.25 : 1 }}>
-                <circle cx={startX + i * spacing} cy={502} r="17"
-                  fill="rgba(11,16,29,0.92)"
-                  stroke={isSel ? paletteAccent : 'rgba(212,175,55,0.4)'}
-                  strokeWidth={isSel ? 2 : 1.2}
-                  style={{ filter: isSel ? `drop-shadow(0 0 6px ${paletteAccent})` : 'none' }} />
-                <text x={startX + i * spacing} y={507} textAnchor="middle"
-                  fontFamily="Cinzel, serif" fontWeight="600" fontSize="15"
-                  fill={isSel ? paletteAccent : '#fff3b8'}>{n}</text>
-              </g>
-            );
-          });
-        })()}
 
-        {/* Подсказка суммы */}
-        <text x="180" y="58" textAnchor="middle" fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="15"
-          fill="rgba(212,175,55,0.85)">
-          {solved ? '· Stella revelata ·' : lang === 'en' ? '· Every ray sums to 22 ·' : '· Каждый луч — сумма 22 ·'}
-        </text>
+        {/* Перетаскиваемые шайбы */}
+        {pieces.map(pc => {
+          const isDrag = dragId === pc.id;
+          return (
+            <g key={pc.id} onPointerDown={onPointerDown(pc)}
+              style={{ cursor: solved ? 'default' : 'grab', touchAction: 'none' }}>
+              <g transform={`translate(${pc.x},${pc.y})`}
+                style={{ transition: isDrag ? 'none' : 'transform 0.28s cubic-bezier(.4,1.5,.5,1)' }}>
+                {isDrag && <ellipse cx="0" cy={TILE_R + 3} rx={TILE_R} ry="3" fill="black" opacity="0.4" style={{ filter:'blur(2px)' }} />}
+                <g transform={`translate(0,${isDrag ? -3 : 0}) scale(${isDrag ? 1.1 : 1})`}>
+                  <circle r={TILE_R} fill="rgba(11,16,29,0.92)"
+                    stroke={solved ? '#E5C158' : paletteAccent} strokeWidth="1.8"
+                    style={{ filter: `drop-shadow(0 0 6px ${solved ? '#E5C158' : paletteAccent})` }} />
+                  <text x="0" y="6" textAnchor="middle"
+                    fontFamily="Cinzel, serif" fontWeight="600" fontSize="16"
+                    fill={solved ? '#fff3b8' : '#fff'}>{pc.value}</text>
+                </g>
+              </g>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -1058,74 +1089,51 @@ function htGenLevel(levelIdx, difficulty) {
   const size = difficulty === 'easy' ? 4 : difficulty === 'hard' ? 6 : 5;
   const rng = htXr(levelIdx * 4567 + 31);
 
-  // Генерируем базу: каждая строка — перестановка 1..size
-  let grid = Array.from({ length: size }, () => {
-    const row = Array.from({ length: size }, (_, i) => i + 1);
-    for (let i = row.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [row[i], row[j]] = [row[j], row[i]];
-    }
-    return row;
-  });
-
-  // Вносим дубликаты: для каждой строки с вероятностью дублируем одно значение из другой строки
-  const crossedSolution = Array.from({ length: size }, () => Array(size).fill(false));
-  for (let r = 0; r < size; r++) {
-    const dupsCount = difficulty === 'easy' ? 1 : difficulty === 'hard' ? 2 : 1;
-    for (let d = 0; d < dupsCount; d++) {
-      const c1 = Math.floor(rng() * size);
-      const c2 = Math.floor(rng() * size);
-      if (c1 !== c2) {
-        grid[r][c2] = grid[r][c1]; // дубликат в строке
-      }
-    }
+  // Шаг 1: строим латинский квадрат size×size (числа 1..size, уникальны в строке и столбце)
+  // Метод: строка r = циклический сдвиг базовой перестановки, затем перемешиваем столбцы
+  const base = Array.from({ length: size }, (_, i) => i + 1);
+  const latin = Array.from({ length: size }, (_, r) =>
+    base.map((_, c) => ((r + c) % size) + 1)
+  );
+  // Перемешиваем столбцы
+  const colPerm = Array.from({ length: size }, (_, i) => i);
+  for (let i = colPerm.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1)); [colPerm[i], colPerm[j]] = [colPerm[j], colPerm[i]];
   }
+  // Перемешиваем строки
+  const rowPerm = Array.from({ length: size }, (_, i) => i);
+  for (let i = rowPerm.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1)); [rowPerm[i], rowPerm[j]] = [rowPerm[j], rowPerm[i]];
+  }
+  const shuffled = rowPerm.map(r => colPerm.map(c => latin[r][c]));
 
-  // Упрощённый подход: помечаем cells что надо зачеркнуть (одну из пар дубликатов в каждой строке/столбце)
-  // На самом деле для правильной игры нужна валидная задача.
-  // Используем простую стратегию: найдём все строки с дубликатами, зачеркнём один из дубликатов
+  // Шаг 2: выбираем ячейки для зачёркивания — не смежные друг с другом
   const solution = Array.from({ length: size }, () => Array(size).fill(false));
-
-  // Найти дубликаты в строках
-  for (let r = 0; r < size; r++) {
-    const seen = new Map();
-    for (let c = 0; c < size; c++) {
-      const v = grid[r][c];
-      if (seen.has(v)) {
-        // Зачеркиваем второй — но проверяем что не касается уже зачёркнутых
-        const c2 = c;
-        const c1 = seen.get(v);
-        // Выбираем тот который не касается уже зачёркнутого
-        let chosen = c2;
-        if (c2 > 0 && solution[r][c2 - 1]) chosen = c1;
-        if (c2 < size - 1 && solution[r][c2 + 1]) chosen = c1;
-        if (r > 0 && solution[r-1][chosen]) chosen = chosen === c2 ? c1 : c2;
-        solution[r][chosen] = true;
-        seen.set(v, c1); // первый остаётся видимым
-      } else {
-        seen.set(v, c);
-      }
-    }
+  const crossTarget = difficulty === 'easy' ? size - 1 : difficulty === 'hard' ? size + 1 : size;
+  let crossed = 0, attempts = 0;
+  while (crossed < crossTarget && attempts < 300) {
+    attempts++;
+    const r = Math.floor(rng() * size);
+    const c = Math.floor(rng() * size);
+    if (solution[r][c]) continue;
+    const adj = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+    if (adj.some(([nr,nc]) => nr >= 0 && nr < size && nc >= 0 && nc < size && solution[nr][nc])) continue;
+    solution[r][c] = true;
+    crossed++;
   }
 
-  // Найти дубликаты в столбцах
-  for (let c = 0; c < size; c++) {
-    const seen = new Map();
-    for (let r = 0; r < size; r++) {
-      const v = grid[r][c];
-      if (seen.has(v)) {
-        const r2 = r;
-        const r1 = seen.get(v);
-        let chosen = r2;
-        if (r2 > 0 && solution[r2-1][c]) chosen = r1;
-        if (r2 < size-1 && solution[r2+1][c]) chosen = r1;
-        if (c > 0 && solution[chosen][c-1]) chosen = chosen === r2 ? r1 : r2;
-        if (c < size-1 && solution[chosen][c+1]) chosen = chosen === r2 ? r1 : r2;
-        solution[chosen][c] = true;
-        seen.set(v, r1);
-      } else {
-        seen.set(v, r);
-      }
+  // Шаг 3: строим grid — копируем латинский квадрат, затем зачёркнутым ячейкам
+  // ставим дубликат значения из той же строки (гарантирует наличие дубликата)
+  const grid = shuffled.map(row => row.slice());
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (!solution[r][c]) continue;
+      // Берём значение незачёркнутой ячейки той же строки (всегда есть — не вся строка зачёркнута)
+      const visibleInRow = [];
+      for (let cc = 0; cc < size; cc++) { if (!solution[r][cc]) visibleInRow.push(grid[r][cc]); }
+      // Предпочитаем значение из того же столбца (дубликат в столбце тоже)
+      const sameCol = grid[r][c]; // исходное значение из латинского квадрата
+      grid[r][c] = visibleInRow.length > 0 ? visibleInRow[Math.floor(rng() * visibleInRow.length)] : sameCol;
     }
   }
 
@@ -1133,17 +1141,28 @@ function htGenLevel(levelIdx, difficulty) {
 }
 
 function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
-  const { grid: GRID, solution: SOLUTION, size } = _uM_q(
-    () => htGenLevel(levelIdx, difficulty), [levelIdx, difficulty]
-  );
+  const { grid: GRID, solution: SOLUTION, size } = _uM_q(() => {
+    try { return htGenLevel(levelIdx, difficulty); }
+    catch(e) { try { return htGenLevel(1, difficulty); } catch(e2) { return htGenLevel(1, 'normal'); } }
+  }, [levelIdx, difficulty]);
 
-  // Состояние игрока: null=нетронуто, true=зачёркнуто, false=явно помечено как незачёркнуто (кружок)
+  // Состояние игрока: null=нетронуто, true=зачёркнуто
   const [cells, setCells] = _uS_q(() => Array.from({ length: size * size }, () => null));
   const [solved, setSolved] = _uS_q(false);
   const svgRef = _uR_q(null);
   const cellsRef = _uR_q(cells);
   cellsRef.current = cells;
-  const dragModeRef = _uR_q(null); // { fill: true|false|null }
+  const dragModeRef = _uR_q(null); // { fill: true|null }
+  const solvedRef = _uR_q(false);
+  const winTimerRef = _uR_q(null);
+
+  // Сброс при смене уровня или сложности
+  _uE_q(() => {
+    setCells(Array.from({ length: size * size }, () => null));
+    setSolved(false);
+    solvedRef.current = false;
+    if (winTimerRef.current) { clearTimeout(winTimerRef.current); winTimerRef.current = null; }
+  }, [levelIdx, difficulty, size]);
 
   const CELL = Math.min(54, Math.floor(300 / size));
   const gridW = size * CELL;
@@ -1151,7 +1170,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const PAD_LEFT = Math.round((360 - gridW) / 2);
   const PAD_TOP = 70;
   const W = 360;
-  const H = PAD_TOP + gridH + 40;
+  const H = PAD_TOP + gridH + 60; // viewBox height = SVG height used in svgPt
   const cellIdx = (r, c) => r * size + c;
 
   // Ошибки для подсветки
@@ -1159,15 +1178,15 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     const errs = new Set();
     // Проверка строк: незачёркнутые числа не должны повторяться
     for (let r = 0; r < size; r++) {
-      const seen = new Map();
+      const seen = new Map(); // value -> [indices]
       for (let c = 0; c < size; c++) {
-        if (cells[cellIdx(r, c)] === true) continue; // зачёркнута
+        if (cells[cellIdx(r, c)] === true) continue;
         const v = GRID[r][c];
-        if (seen.has(v)) {
-          errs.add(cellIdx(r, c));
-          errs.add(seen.get(v));
-        } else seen.set(v, cellIdx(r, c));
+        const idx = cellIdx(r, c);
+        if (!seen.has(v)) seen.set(v, []);
+        seen.get(v).push(idx);
       }
+      seen.forEach(indices => { if (indices.length > 1) indices.forEach(i => errs.add(i)); });
     }
     // Проверка столбцов
     for (let c = 0; c < size; c++) {
@@ -1175,11 +1194,11 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
       for (let r = 0; r < size; r++) {
         if (cells[cellIdx(r, c)] === true) continue;
         const v = GRID[r][c];
-        if (seen.has(v)) {
-          errs.add(cellIdx(r, c));
-          errs.add(seen.get(v));
-        } else seen.set(v, cellIdx(r, c));
+        const idx = cellIdx(r, c);
+        if (!seen.has(v)) seen.set(v, []);
+        seen.get(v).push(idx);
       }
+      seen.forEach(indices => { if (indices.length > 1) indices.forEach(i => errs.add(i)); });
     }
     // Проверка смежных зачёркнутых
     for (let r = 0; r < size; r++) {
@@ -1198,25 +1217,29 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
 
   // Победа
   _uE_q(() => {
-    if (cells.some(v => v === null)) return;
-    // Нет ошибок и расположение совпадает с решением
+    if (solvedRef.current) return;
+    if (!cells.some(v => v === true)) return;
     const correct = cells.every((v, i) => {
       const r = Math.floor(i / size), c = i % size;
       return (v === true) === SOLUTION[r][c];
     });
-    if (correct && !solved) {
+    if (correct) {
+      solvedRef.current = true;
       setSolved(true);
       SFX && SFX.win(); VIB && VIB.win();
-      setTimeout(() => onWin && onWin(), 1400);
+      winTimerRef.current = setTimeout(() => onWin && onWin(), 1400);
     }
   }, [cells]);
+  _uE_q(() => () => { if (winTimerRef.current) clearTimeout(winTimerRef.current); }, []);
 
   const svgPt = (clientX, clientY) => {
-    const rect = svgRef.current.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) * (W / rect.width),
-      y: (clientY - rect.top)  * (H / rect.height),
-    };
+    if (!svgRef.current) return { x: 0, y: 0 };
+    const pt = svgRef.current.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    const ctm = svgRef.current.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const r = pt.matrixTransform(ctm.inverse());
+    return { x: r.x, y: r.y };
   };
 
   const ptToCell = (x, y) => {
@@ -1229,8 +1252,8 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const cycleCell = (r, c) => {
     const idx = cellIdx(r, c);
     const cur = cellsRef.current[idx];
-    // null → true (зачёркнуто) → false (кружок) → null
-    return cur === null ? true : cur === true ? false : null;
+    // null → true (зачёркнуто) → null (сброс), кружок убираем — только зачеркнуть или пусто
+    return cur === null ? true : null;
   };
 
   const onPointerDown = (e) => {
@@ -1266,9 +1289,10 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const onPointerUp = () => { dragModeRef.current = null; };
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%' }}>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H + 30}`} width="100%" height="100%"
-        style={{ touchAction:'none', display:'block' }}
+    <div style={{ position:'relative', width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+        style={{ touchAction:'none', display:'block', width:'100%', height:'100%', maxWidth:`${W}px` }}
+        preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
         onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
 
@@ -1282,7 +1306,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
             const val = cells[idx];
             const isErr = errors.has(idx);
             const isCrossed = val === true;
-            const isCircled = val === false;
+            const isCircled = false; // кружок убран — только зачеркнуть или пусто
             const x = PAD_LEFT + c * CELL, y = PAD_TOP + r * CELL;
             const cx = x + CELL / 2, cy = y + CELL / 2;
             return (
@@ -1327,7 +1351,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         <text x={W/2} y={PAD_TOP + size*CELL + 22} textAnchor="middle"
           fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="15"
           fill="rgba(212,175,55,0.85)">
-          {solved ? '· Hitori solutum ·' : lang === 'en' ? '· Tap — cross out · again — circle · again — clear ·' : '· Тап — зачеркнуть · ещё раз — кружок · ещё — убрать ·'}
+          {solved ? '· Hitori solutum ·' : lang === 'en' ? '· Tap to cross out · tap again to clear ·' : '· Тап — зачеркнуть · ещё раз — убрать ·'}
         </text>
       </svg>
     </div>

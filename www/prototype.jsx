@@ -2,6 +2,29 @@
 
 const { useState: _uS_p, useEffect: _uE_p, useRef: _uR_p } = React;
 
+class PuzzleErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: false }; }
+  static getDerivedStateFromError() { return { error: true }; }
+  componentDidCatch(err) { console.error('Puzzle crash:', err); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:16 }}>
+          <div style={{ fontFamily:'Cinzel, serif', fontSize:13, color:'#D4AF37', letterSpacing:3, textAlign:'center' }}>
+            · Erratum ·
+          </div>
+          <button onClick={() => this.setState({ error: false })}
+            style={{ fontFamily:'Cinzel, serif', fontSize:11, letterSpacing:3, color:'rgba(229,193,88,0.85)',
+              background:'transparent', border:'1px solid rgba(212,175,55,0.4)', borderRadius:999, padding:'8px 20px' }}>
+            RESET
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, paletteAccent, difficulty = 'normal' }) {
   const t = useT(lang);
   const [hint, setHint] = _uS_p(false);
@@ -114,10 +137,12 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
 
         {/* Inner velvet vignette */}
         <div style={{ position:'absolute', inset:14 }}>
-          <Puzzle key={`${resetKey}-${difficulty}`} onWin={handleWin} paletteAccent={paletteAccent} levelIdx={levelIdx}
-            difficulty={difficulty} lang={lang}
-            onSumChange={chapterIdx === 0 ? (sum, target) => setSumInfo({ sum, target }) : undefined}
-            onHint={chapterIdx === 0 ? (h) => setHintText(h) : undefined} />
+          <PuzzleErrorBoundary key={`${resetKey}-${difficulty}`}>
+            <Puzzle key={`${resetKey}-${difficulty}`} onWin={handleWin} paletteAccent={paletteAccent} levelIdx={levelIdx}
+              difficulty={difficulty} lang={lang}
+              onSumChange={chapterIdx === 0 ? (sum, target) => setSumInfo({ sum, target }) : undefined}
+              onHint={chapterIdx === 0 ? (h) => setHintText(h) : undefined} />
+          </PuzzleErrorBoundary>
         </div>
       </div>
 
