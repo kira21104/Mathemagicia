@@ -1176,6 +1176,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   // Ошибки для подсветки
   const errors = _uM_q(() => {
     const errs = new Set();
+    if (cells.length !== size * size) return errs; // защита от рассинхрона при смене уровня
     // Проверка строк: незачёркнутые числа не должны повторяться
     for (let r = 0; r < size; r++) {
       const seen = new Map(); // value -> [indices]
@@ -1215,21 +1216,62 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     return errs;
   }, [cells]);
 
-  // Победа
+  // Победа — проверяем правила Хитори, а не конкретное решение
   _uE_q(() => {
     if (solvedRef.current) return;
+    if (cells.length !== size * size) return;
     if (!cells.some(v => v === true)) return;
-    const correct = cells.every((v, i) => {
-      const r = Math.floor(i / size), c = i % size;
-      return (v === true) === SOLUTION[r][c];
-    });
-    if (correct) {
-      solvedRef.current = true;
-      setSolved(true);
-      SFX && SFX.win(); VIB && VIB.win();
-      winTimerRef.current = setTimeout(() => onWin && onWin(), 1400);
+    // Правило 1: нет незачёркнутых дубликатов в строке
+    for (let r = 0; r < size; r++) {
+      const seen = new Set();
+      for (let c = 0; c < size; c++) {
+        if (cells[cellIdx(r, c)] === true) continue;
+        const v = GRID[r][c];
+        if (seen.has(v)) return;
+        seen.add(v);
+      }
     }
-  }, [cells]);
+    // Правило 2: нет незачёркнутых дубликатов в столбце
+    for (let c = 0; c < size; c++) {
+      const seen = new Set();
+      for (let r = 0; r < size; r++) {
+        if (cells[cellIdx(r, c)] === true) continue;
+        const v = GRID[r][c];
+        if (seen.has(v)) return;
+        seen.add(v);
+      }
+    }
+    // Правило 3: нет смежных зачёркнутых
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (cells[cellIdx(r, c)] !== true) continue;
+        if (c < size - 1 && cells[cellIdx(r, c + 1)] === true) return;
+        if (r < size - 1 && cells[cellIdx(r + 1, c)] === true) return;
+      }
+    }
+    // Правило 4: незачёркнутые ячейки связны (flood fill)
+    const visible = [];
+    for (let i = 0; i < size * size; i++) { if (cells[i] !== true) visible.push(i); }
+    if (visible.length === 0) return;
+    const visited = new Set();
+    const queue = [visible[0]];
+    visited.add(visible[0]);
+    while (queue.length) {
+      const idx = queue.shift();
+      const r = Math.floor(idx / size), c = idx % size;
+      for (const [nr, nc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]) {
+        if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+        const ni = cellIdx(nr, nc);
+        if (cells[ni] === true || visited.has(ni)) continue;
+        visited.add(ni); queue.push(ni);
+      }
+    }
+    if (visited.size !== visible.length) return;
+    solvedRef.current = true;
+    setSolved(true);
+    SFX && SFX.win(); VIB && VIB.win();
+    winTimerRef.current = setTimeout(() => onWin && onWin(), 1400);
+  }, [cells, size]);
   _uE_q(() => () => { if (winTimerRef.current) clearTimeout(winTimerRef.current); }, []);
 
   const svgPt = (clientX, clientY) => {
@@ -1258,7 +1300,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
 
   const onPointerDown = (e) => {
     if (solved) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch(_) {}
     const p = svgPt(e.clientX, e.clientY);
     const cell = ptToCell(p.x, p.y);
     if (!cell) return;
