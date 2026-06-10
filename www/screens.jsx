@@ -586,194 +586,279 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
   );
 }
 
-// ─────────────────────────── CAROUSEL — горизонтальный свайп карточек созвездий одной главы
-function ChapterConstCarousel({ constellations, paletteAccent, lang, ci }) {
-  const [idx, setIdx] = _uS_s(0);
-  const total = constellations.length;
-  const touchStartX = _uR_s(null);
+// ─────────────────────────── SKY COLLECTION (global — бесконечное небо с pan/zoom)
 
-  const prev = () => setIdx(i => Math.max(0, i - 1));
-  const next = () => setIdx(i => Math.min(total - 1, i + 1));
+// Размещает созвездия на полотне без перекрытий, каждое рядом с предыдущим
+function skyLayoutConstellations(items) {
+  // Каждое созвездие занимает ячейку CELL×CELL в координатах полотна
+  const CELL = 200;
+  const placed = []; // { item, cx, cy } — центр ячейки
+  const occupied = new Set(); // "gx,gy" занятые ячейки
 
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
-  const onTouchEnd = (e) => {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (dx < -40) next();
-    else if (dx > 40) prev();
-    touchStartX.current = null;
-  };
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
 
-  if (total === 0) return null;
-  const { pts, lines, ru, en, la, starsLit } = constellations[idx];
+  // xorshift для воспроизводимого порядка направлений
+  let rngS = 7919;
+  const rng = () => { rngS ^= rngS << 13; rngS ^= rngS >> 17; rngS ^= rngS << 5; return (rngS >>> 0) / 0xFFFFFFFF; };
+  const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length-1; i > 0; i--) { const j = Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 
-  return (
-    <div style={{ userSelect:'none' }}
-      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+  for (let i = 0; i < items.length; i++) {
+    if (i === 0) {
+      placed.push({ item: items[0], gx: 0, gy: 0 });
+      occupied.add('0,0');
+      continue;
+    }
+    // Ищем свободную клетку рядом с уже размещёнными (BFS по занятым)
+    const candidates = [];
+    for (const p of placed) {
+      for (const [dx, dy] of dirs) {
+        const nx = p.gx + dx, ny = p.gy + dy;
+        const key = `${nx},${ny}`;
+        if (!occupied.has(key)) candidates.push({ nx, ny, key });
+      }
+    }
+    // Перемешиваем кандидатов и берём первого свободного
+    const shuffled = shuffle(candidates);
+    const chosen = shuffled[0] || { nx: i, ny: 0, key: `${i},0` };
+    placed.push({ item: items[i], gx: chosen.nx, gy: chosen.ny });
+    occupied.add(chosen.key);
+  }
 
-      {/* Карточка */}
-      <div style={{
-        display:'flex', flexDirection:'column', alignItems:'center',
-        background:'rgba(8,12,28,0.82)',
-        border:'1px solid rgba(212,175,55,0.25)',
-        borderRadius:12,
-        padding:'10px 10px 8px',
-        margin:'0 auto',
-        width: 200,
-        position:'relative',
-      }}>
-        {/* Стрелки — только если больше одной карточки */}
-        {total > 1 && (
-          <>
-            <button className="btn-reset" onClick={prev} disabled={idx === 0} style={{
-              position:'absolute', left:6, top:'50%', transform:'translateY(-50%)',
-              color: idx === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
-              fontSize:18, lineHeight:1,
-            }}>‹</button>
-            <button className="btn-reset" onClick={next} disabled={idx === total - 1} style={{
-              position:'absolute', right:6, top:'50%', transform:'translateY(-50%)',
-              color: idx === total - 1 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
-              fontSize:18, lineHeight:1,
-            }}>›</button>
-          </>
-        )}
-
-        <svg viewBox="0 0 160 200" width="140" height="120" style={{ overflow:'visible' }}>
-          <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
-            {(lines || []).map(([a, b], li) => {
-              const A = pts[a], B = pts[b];
-              if (!A || !B) return null;
-              return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
-            })}
-          </g>
-          {pts.map((p, si) => {
-            const lit = si < starsLit;
-            return (
-              <g key={si}>
-                {lit && <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />}
-                <circle cx={p.x} cy={p.y}
-                  r={lit ? 3.8 : 2}
-                  fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
-                  style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
-                />
-              </g>
-            );
-          })}
-        </svg>
-
-        <div style={{
-          fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-          fontSize:13, color:'rgba(229,193,88,0.9)', textAlign:'center',
-          marginTop:4, lineHeight:1.25,
-        }}>{lang === 'en' ? (en || ru) : ru}</div>
-        {la && (
-          <div style={{
-            fontFamily:'Comfortaa, sans-serif', fontSize:8, letterSpacing:0.5,
-            color:'rgba(212,175,55,0.4)', marginTop:2, textAlign:'center',
-          }}>{la}</div>
-        )}
-
-        {/* Пагинация точками */}
-        {total > 1 && (
-          <div style={{ display:'flex', gap:5, marginTop:8 }}>
-            {Array.from({ length: total }, (_, i) => (
-              <button key={i} className="btn-reset" onClick={() => setIdx(i)} style={{
-                width: i === idx ? 14 : 6,
-                height: 6,
-                borderRadius: 3,
-                background: i === idx ? paletteAccent : 'rgba(212,175,55,0.25)',
-                transition: 'all 0.25s ease',
-              }} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  // Переводим в пиксели полотна
+  return placed.map(p => ({
+    ...p.item,
+    wx: p.gx * CELL,
+    wy: p.gy * CELL,
+  }));
 }
 
-// ─────────────────────────── SKY COLLECTION (global — all chapters)
 function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, lang = 'ru', onClose }) {
   const t = useT(lang);
   const LEVELS_PER_PAGE = 6;
-  const chapterRomanNums = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
-  // Собираем все завершённые созвездия по всем главам
-  const allGroups = chapters.map((chapterName, ci) => {
-    const done = chapterLevels[ci] || 0;
-    if (done === 0) return null;
-    const totalPgs = Math.ceil(done / LEVELS_PER_PAGE);
-    const constellations = Array.from({ length: totalPgs }, (_, pi) => {
-      const cdata = getConstellationData(pi, ci);
-      const starsTotal = cdata.pts.length;
-      const pageStart = pi * LEVELS_PER_PAGE;
-      const starsLit = Math.min(starsTotal, done - pageStart);
-      return { pts: cdata.pts, lines: cdata.lines, ru: cdata.ru, en: cdata.en, la: cdata.la, starsLit, pi, ci };
+  // Собираем все завершённые созвездия
+  const allItems = _uM_s(() => {
+    const items = [];
+    chapters.forEach((chapterName, ci) => {
+      const done = chapterLevels[ci] || 0;
+      if (done === 0) return;
+      const totalPgs = Math.ceil(done / LEVELS_PER_PAGE);
+      for (let pi = 0; pi < totalPgs; pi++) {
+        const cdata = getConstellationData(pi, ci);
+        const starsTotal = cdata.pts.length;
+        const starsLit = Math.min(starsTotal, done - pi * LEVELS_PER_PAGE);
+        items.push({ pts: cdata.pts, lines: cdata.lines, ru: cdata.ru, en: cdata.en, la: cdata.la, starsLit, id: `${ci}-${pi}` });
+      }
     });
-    return { chapterName, ci, constellations };
-  }).filter(Boolean);
+    return items;
+  }, [chapterLevels, chapters]);
 
-  const totalAny = allGroups.reduce((s, g) => s + g.constellations.length, 0);
+  const placed = _uM_s(() => skyLayoutConstellations(allItems), [allItems]);
+
+  // Pan + zoom
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 4, ZOOM_START = 1;
+  const [zoom, setZoom] = _uS_s(ZOOM_START);
+  // Первое созвездие (wx=0,wy=0) центрируется горизонтально и чуть ниже хедера
+  const [pan, setPan] = _uS_s({ x: 90, y: 200 });
+  const [activeId, setActiveId] = _uS_s(null); // id созвездия с открытой подсказкой
+
+  const containerRef = _uR_s(null);
+  const zoomRef = _uR_s(zoom);
+  const panRef = _uR_s(pan);
+  zoomRef.current = zoom;
+  panRef.current = pan;
+
+  // Жесты: одним пальцем — pan, двумя — pinch-zoom
+  const ptrs = _uR_s({}); // pointerId → {x,y}
+  const lastPinchDist = _uR_s(null);
+
+  const getContainerCenter = () => {
+    if (!containerRef.current) return { cx: 190, cy: 400 };
+    const r = containerRef.current.getBoundingClientRect();
+    return { cx: r.width / 2, cy: r.height / 2 };
+  };
+
+  const onPtrDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    ptrs.current[e.pointerId] = { x: e.clientX, y: e.clientY };
+    lastPinchDist.current = null;
+  };
+
+  const onPtrMove = (e) => {
+    const ids = Object.keys(ptrs.current);
+    if (!ptrs.current[e.pointerId]) return;
+    const prev = ptrs.current[e.pointerId];
+    ptrs.current[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+    if (ids.length === 1) {
+      // Pan
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }));
+    } else if (ids.length >= 2) {
+      // Pinch zoom
+      const [id0, id1] = ids;
+      const p0 = ptrs.current[id0], p1 = ptrs.current[id1];
+      if (!p0 || !p1) return;
+      const dist = Math.hypot(p0.x - p1.x, p0.y - p1.y);
+      if (lastPinchDist.current !== null) {
+        const ratio = dist / lastPinchDist.current;
+        const { cx, cy } = getContainerCenter();
+        setZoom(z => {
+          const nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * ratio));
+          // Зумим относительно центра экрана
+          const scale = nz / z;
+          setPan(p => ({
+            x: cx - (cx - p.x) * scale,
+            y: cy - (cy - p.y) * scale,
+          }));
+          return nz;
+        });
+      }
+      lastPinchDist.current = dist;
+    }
+  };
+
+  const onPtrUp = (e) => { delete ptrs.current[e.pointerId]; lastPinchDist.current = null; };
+
+  // Тап по созвездию
+  const tapMoved = _uR_s(false);
+  const tapStart = _uR_s(null);
+  const onSvgPtrDown = (e) => { tapMoved.current = false; tapStart.current = { x: e.clientX, y: e.clientY }; };
+  const onSvgPtrMove = (e) => { if (tapStart.current && Math.hypot(e.clientX - tapStart.current.x, e.clientY - tapStart.current.y) > 6) tapMoved.current = true; };
+  const onSvgPtrUp = () => { tapStart.current = null; };
+
+  const handleConstTap = (id) => {
+    if (tapMoved.current) return;
+    setActiveId(prev => prev === id ? null : id);
+  };
+
+  const CELL = 200; // должно совпадать с skyLayoutConstellations
 
   return (
     <div style={{
       position:'absolute', inset:0, zIndex:50,
-      background:'radial-gradient(ellipse at 50% 20%, rgba(10,18,45,0.98), rgba(2,4,10,0.99) 75%)',
-      display:'flex', flexDirection:'column', alignItems:'center',
+      background:'radial-gradient(ellipse at 50% 30%, #0a1230 0%, #020408 100%)',
+      overflow:'hidden',
+      touchAction:'none',
     }}>
-      <GoldDust count={50} area={{ w:380, h:800 }} />
-
-      {/* Фоновые звёзды */}
+      {/* Фоновые звёзды — фиксированные, не двигаются */}
       <svg style={{ position:'absolute', inset:0, pointerEvents:'none' }} width="100%" height="100%">
-        {Array.from({length:80}).map((_,i)=>{
+        {Array.from({length:120}).map((_,i)=>{
           const x = (i * 137.508) % 100;
           const y = (i * 97.3 + i * 13.7) % 100;
-          const r = 0.35 + (i % 4) * 0.28;
-          return <circle key={i} cx={`${x}%`} cy={`${y}%`} r={r} fill="#E5C158" opacity={0.15 + (i % 6) * 0.06} />;
+          const r = 0.3 + (i % 5) * 0.22;
+          return <circle key={i} cx={`${x}%`} cy={`${y}%`} r={r} fill="#E5C158" opacity={0.08 + (i % 7) * 0.04} />;
         })}
       </svg>
 
       {/* Header */}
-      <div style={{ position:'relative', zIndex:2, marginTop:66, textAlign:'center', paddingBottom:10 }}>
+      <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:10, paddingTop:60, textAlign:'center', pointerEvents:'none' }}>
         <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:6, color:'rgba(212,175,55,0.55)', textTransform:'uppercase' }}>{t('skyTitle')}</div>
-        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:20, color:'#fff3b8', marginTop:3, letterSpacing:0.5 }}>{t('skySubtitle')}</div>
-        <div style={{ width:70, height:1, margin:'8px auto 0', background:'linear-gradient(90deg,transparent,#D4AF37,transparent)', opacity:0.5 }} />
-      </div>
-
-      {/* Созвездия — прокручиваемая область */}
-      <div style={{ position:'relative', zIndex:2, flex:1, width:'100%', overflowY:'auto', padding:'12px 16px 24px' }}>
-        {totalAny === 0 ? (
-          <div style={{ textAlign:'center', marginTop:80,
-            fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-            fontSize:17, color:'rgba(229,193,88,0.35)', lineHeight:1.5 }}>
-            {t('skyEmpty').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br/>}</span>)}
-          </div>
-        ) : (
-          allGroups.map(({ chapterName, ci, constellations }) => (
-            <div key={ci} style={{ marginBottom:22 }}>
-              {/* Заголовок главы */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <div style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,rgba(212,175,55,0.3))' }} />
-                <div style={{ fontFamily:'Cinzel, serif', fontSize:9, letterSpacing:4,
-                  color:'rgba(212,175,55,0.6)', textTransform:'uppercase', whiteSpace:'nowrap' }}>
-                  {chapterRomanNums[ci]} · {chapterName}
-                </div>
-                <div style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(212,175,55,0.3),transparent)' }} />
-              </div>
-
-              {/* Карточки созвездий этой главы — горизонтальный свайп */}
-              <ChapterConstCarousel constellations={constellations} paletteAccent={paletteAccent} lang={lang} ci={ci} />
-            </div>
-          ))
-        )}
+        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:20, color:'#fff3b8', marginTop:3 }}>{t('skySubtitle')}</div>
+        <div style={{ width:70, height:1, margin:'8px auto 0', background:'linear-gradient(90deg,transparent,#D4AF37,transparent)', opacity:0.4 }} />
       </div>
 
       {/* Закрыть */}
-      <button onClick={onClose} className="btn-reset" style={{
-        position:'absolute', top:62, right:18, zIndex:10,
-      }}>
+      <button onClick={onClose} className="btn-reset" style={{ position:'absolute', top:62, right:18, zIndex:20 }}>
         <Icon kind="close" size={22} />
       </button>
+
+      {/* Пустое состояние */}
+      {allItems.length === 0 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+          <div style={{ textAlign:'center', fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:17, color:'rgba(229,193,88,0.35)', lineHeight:1.6 }}>
+            {t('skyEmpty').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br/>}</span>)}
+          </div>
+        </div>
+      )}
+
+      {/* Полотно с созвездиями */}
+      {allItems.length > 0 && (
+        <div
+          ref={containerRef}
+          style={{ position:'absolute', inset:0, touchAction:'none', cursor:'grab' }}
+          onPointerDown={onPtrDown}
+          onPointerMove={onPtrMove}
+          onPointerUp={onPtrUp}
+          onPointerLeave={onPtrUp}
+          onPointerCancel={onPtrUp}
+        >
+          {/* Трансформируемый слой */}
+          <div style={{
+            position:'absolute', left: pan.x, top: pan.y,
+            transform: `scale(${zoom})`, transformOrigin: '0 0',
+            willChange: 'transform',
+          }}>
+            {placed.map(({ pts, lines, ru, en, la, starsLit, id, wx, wy }) => {
+              const isActive = activeId === id;
+              const name = lang === 'en' ? (en || ru) : ru;
+              return (
+                <div
+                  key={id}
+                  style={{ position:'absolute', left: wx, top: wy, width: CELL, height: CELL }}
+                  onPointerDown={onSvgPtrDown}
+                  onPointerMove={onSvgPtrMove}
+                  onPointerUp={(e) => { onSvgPtrUp(e); handleConstTap(id); }}
+                >
+                  <svg viewBox="0 0 160 200" width={CELL} height={CELL} style={{ overflow:'visible', display:'block' }}>
+                    {/* Линии созвездия */}
+                    <g stroke="rgba(212,175,55,0.28)" strokeWidth="1">
+                      {(lines || []).map(([a, b], li) => {
+                        const A = pts[a], B = pts[b];
+                        if (!A || !B) return null;
+                        return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
+                      })}
+                    </g>
+                    {/* Звёзды */}
+                    {pts.map((p, si) => {
+                      const lit = si < starsLit;
+                      return (
+                        <g key={si}>
+                          {lit && <circle cx={p.x} cy={p.y} r="8" fill={paletteAccent} opacity="0.07" />}
+                          <circle cx={p.x} cy={p.y}
+                            r={lit ? 3.2 : 1.8}
+                            fill={lit ? '#E5C158' : 'rgba(212,175,55,0.18)'}
+                            style={{ filter: lit ? 'drop-shadow(0 0 3px rgba(229,193,88,0.85))' : 'none' }}
+                          />
+                        </g>
+                      );
+                    })}
+                  </svg>
+
+                  {/* Плашка с инфо — над созвездием, появляется по тапу */}
+                  {isActive && (
+                    <div style={{
+                      position:'absolute', left:'50%', top: -2,
+                      transform:'translate(-50%, -100%)',
+                      background:'rgba(8,12,30,0.95)',
+                      border:'1px solid rgba(212,175,55,0.45)',
+                      borderRadius:8,
+                      padding:'6px 12px 5px',
+                      whiteSpace:'nowrap',
+                      pointerEvents:'none',
+                      boxShadow:'0 4px 20px rgba(0,0,0,0.6), 0 0 12px rgba(212,175,55,0.12)',
+                    }}>
+                      <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:13, color:'#fff3b8', lineHeight:1.3 }}>{name}</div>
+                      {la && <div style={{ fontFamily:'Cinzel, serif', fontSize:8, letterSpacing:1, color:'rgba(212,175,55,0.55)', marginTop:2 }}>{la}</div>}
+                      <div style={{ fontFamily:'Comfortaa, sans-serif', fontSize:8, color:'rgba(212,175,55,0.45)', marginTop:2 }}>
+                        {lang === 'en' ? `${starsLit} stars` : `${starsLit} звёзд`}
+                      </div>
+                      {/* Треугольник-указатель */}
+                      <div style={{
+                        position:'absolute', bottom:-5, left:'50%', transform:'translateX(-50%)',
+                        width:0, height:0,
+                        borderLeft:'5px solid transparent', borderRight:'5px solid transparent',
+                        borderTop:'5px solid rgba(212,175,55,0.45)',
+                      }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
