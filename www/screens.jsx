@@ -761,13 +761,62 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       overflow:'hidden',
       touchAction:'none',
     }}>
-      {/* Фоновые звёзды — фиксированные, не двигаются */}
-      <svg style={{ position:'absolute', inset:0, pointerEvents:'none' }} width="100%" height="100%">
-        {Array.from({length:120}).map((_,i)=>{
-          const x = (i * 137.508) % 100;
-          const y = (i * 97.3 + i * 13.7) % 100;
-          const r = 0.3 + (i % 5) * 0.22;
-          return <circle key={i} cx={`${x}%`} cy={`${y}%`} r={r} fill="#E5C158" opacity={0.08 + (i % 7) * 0.04} />;
+      {/* Фоновые звёзды + млечный путь — фиксированные */}
+      <svg style={{ position:'absolute', inset:0, pointerEvents:'none' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          {/* Млечный путь — широкая полоса по диагонали сверху-вниз */}
+          <linearGradient id="mwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#c8d8ff" stopOpacity="0" />
+            <stop offset="20%" stopColor="#c8d8ff" stopOpacity="0.025" />
+            <stop offset="40%" stopColor="#dde8ff" stopOpacity="0.045" />
+            <stop offset="55%" stopColor="#c8d8ff" stopOpacity="0.055" />
+            <stop offset="70%" stopColor="#b0c4ff" stopOpacity="0.03" />
+            <stop offset="100%" stopColor="#c8d8ff" stopOpacity="0" />
+          </linearGradient>
+          <filter id="mwBlur">
+            <feGaussianBlur stdDeviation="18" />
+          </filter>
+        </defs>
+        {/* Млечный путь — два перекрывающихся эллипса для мягкости */}
+        <ellipse cx="190" cy="400" rx="80" ry="430" fill="url(#mwGrad)" filter="url(#mwBlur)"
+          transform="rotate(-20 190 400)" opacity="1" />
+        <ellipse cx="200" cy="390" rx="45" ry="380" fill="url(#mwGrad)" filter="url(#mwBlur)"
+          transform="rotate(-20 190 400)" opacity="0.7" />
+        {/* Мелкие звёзды — много, очень тусклые */}
+        {Array.from({length:200}).map((_,i)=>{
+          const x = (i * 137.508 + 23) % 380;
+          const y = (i * 97.3 + i * 13.7) % 800;
+          const r = 0.25 + (i % 3) * 0.2;
+          const op = 0.06 + (i % 8) * 0.025;
+          return <circle key={`s${i}`} cx={x} cy={y} r={r} fill="#d0ddff" opacity={op} />;
+        })}
+        {/* Средние звёзды */}
+        {Array.from({length:80}).map((_,i)=>{
+          const x = (i * 211.3 + 57) % 380;
+          const y = (i * 163.7 + i * 7.3) % 800;
+          const r = 0.5 + (i % 4) * 0.25;
+          const op = 0.1 + (i % 6) * 0.04;
+          const warm = i % 5 === 0;
+          return <circle key={`m${i}`} cx={x} cy={y} r={r} fill={warm ? '#fff3c0' : '#e0e8ff'} opacity={op} />;
+        })}
+        {/* Крупные звёзды — редкие, чуть ярче */}
+        {Array.from({length:25}).map((_,i)=>{
+          const x = (i * 317.1 + 91) % 380;
+          const y = (i * 251.9 + i * 31) % 800;
+          const r = 0.9 + (i % 3) * 0.4;
+          const op = 0.18 + (i % 4) * 0.06;
+          return <circle key={`l${i}`} cx={x} cy={y} r={r} fill="#ffffff" opacity={op} />;
+        })}
+        {/* Редкие звёзды с мягким свечением */}
+        {Array.from({length:10}).map((_,i)=>{
+          const x = (i * 373 + 140) % 380;
+          const y = (i * 293 + i * 53) % 800;
+          return (
+            <g key={`g${i}`}>
+              <circle cx={x} cy={y} r={3} fill="#fff" opacity={0.04} />
+              <circle cx={x} cy={y} r={1} fill="#fff" opacity={0.22} />
+            </g>
+          );
         })}
       </svg>
 
