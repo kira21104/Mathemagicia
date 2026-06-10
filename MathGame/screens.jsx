@@ -678,12 +678,6 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
     return { cx: r.width / 2, cy: r.height / 2 };
   };
 
-  const onPtrDown = (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    ptrs.current[e.pointerId] = { x: e.clientX, y: e.clientY };
-    lastPinchDist.current = null;
-  };
-
   const onPtrMove = (e) => {
     const ids = Object.keys(ptrs.current);
     if (!ptrs.current[e.pointerId]) return;
@@ -694,6 +688,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       // Pan
       const dx = e.clientX - prev.x;
       const dy = e.clientY - prev.y;
+      if (tapDownPos.current && Math.hypot(dx, dy) > 4) tapMoved.current = true;
       setPan(p => ({ x: p.x + dx, y: p.y + dy }));
     } else if (ids.length >= 2) {
       // Pinch zoom
@@ -719,18 +714,42 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
     }
   };
 
-  const onPtrUp = (e) => { delete ptrs.current[e.pointerId]; lastPinchDist.current = null; };
-
-  // Тап по созвездию
+  // Тап: определяем по расстоянию от нажатия до отпускания
+  const tapDownPos = _uR_s(null);
   const tapMoved = _uR_s(false);
-  const tapStart = _uR_s(null);
-  const onSvgPtrDown = (e) => { tapMoved.current = false; tapStart.current = { x: e.clientX, y: e.clientY }; };
-  const onSvgPtrMove = (e) => { if (tapStart.current && Math.hypot(e.clientX - tapStart.current.x, e.clientY - tapStart.current.y) > 6) tapMoved.current = true; };
-  const onSvgPtrUp = () => { tapStart.current = null; };
 
-  const handleConstTap = (id) => {
-    if (tapMoved.current) return;
-    setActiveId(prev => prev === id ? null : id);
+  const onPtrDown = (e) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch(_) {}
+    ptrs.current[e.pointerId] = { x: e.clientX, y: e.clientY };
+    lastPinchDist.current = null;
+    if (Object.keys(ptrs.current).length === 1) {
+      tapDownPos.current = { x: e.clientX, y: e.clientY };
+      tapMoved.current = false;
+    }
+  };
+
+  const onPtrUp = (e) => {
+    // Проверяем тап — только если один палец и не двигался
+    if (Object.keys(ptrs.current).length === 1 && tapDownPos.current && !tapMoved.current) {
+      // Вычисляем какое созвездие под точкой тапа в координатах полотна
+      const canvasX = (e.clientX - pan.x) / zoom;
+      const canvasY = (e.clientY - pan.y) / zoom;
+      let tapped = null;
+      for (const p of placed) {
+        if (canvasX >= p.wx && canvasX < p.wx + CELL && canvasY >= p.wy && canvasY < p.wy + CELL) {
+          tapped = p.id;
+          break;
+        }
+      }
+      if (tapped !== null) {
+        setActiveId(prev => prev === tapped ? null : tapped);
+      } else {
+        setActiveId(null);
+      }
+    }
+    delete ptrs.current[e.pointerId];
+    lastPinchDist.current = null;
+    tapDownPos.current = null;
   };
 
   const CELL = 200; // должно совпадать с skyLayoutConstellations
@@ -797,9 +816,6 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                 <div
                   key={id}
                   style={{ position:'absolute', left: wx, top: wy, width: CELL, height: CELL }}
-                  onPointerDown={onSvgPtrDown}
-                  onPointerMove={onSvgPtrMove}
-                  onPointerUp={(e) => { onSvgPtrUp(e); handleConstTap(id); }}
                 >
                   <svg viewBox="0 0 160 200" width={CELL} height={CELL} style={{ overflow:'visible', display:'block' }}>
                     {/* Линии созвездия */}
