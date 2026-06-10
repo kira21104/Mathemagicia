@@ -395,4 +395,28 @@ const VIB = (() => {
 SFX.setEnabled(localStorage.getItem('mg_sound') !== 'off');
 VIB.setEnabled(localStorage.getItem('mg_haptics') !== 'off');
 
+// CSS-анимации для звёздного неба
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes twinkle {
+      0%,100% { opacity: var(--op-hi); transform: scale(1); }
+      50%      { opacity: var(--op-lo); transform: scale(0.6); }
+    }
+    @keyframes shoot {
+      0%   { transform: translateX(0) translateY(0) scaleX(1); opacity: 0; }
+      5%   { opacity: 1; }
+      90%  { opacity: 0.7; }
+      100% { transform: translateX(260px) translateY(180px) scaleX(1); opacity: 0; }
+    }
+    @keyframes shootFade {
+      0%,100% { opacity:0; }
+      10%,85% { opacity:1; }
+    }
+    .sky-twinkle { animation: twinkle var(--dur,3s) ease-in-out infinite; animation-delay: var(--delay,0s); }
+    .sky-shoot   { animation: shoot var(--dur,2s) linear infinite; animation-delay: var(--delay,0s); }
+  `;
+  document.head.appendChild(style);
+})();
+
 Object.assign(window, { useT, STRINGS, GoldDust, Candle, Icon, HudButton, CornerFlourish, Astrolabe, Rune, Constellation, SFX, VIB });

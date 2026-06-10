@@ -761,17 +761,64 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       overflow:'hidden',
       touchAction:'none',
     }}>
-      {/* Фото ночного неба — фиксированный фон */}
+      {/* Фото ночного неба */}
       <img src="sky-bg.avif" style={{
         position:'absolute', inset:0, width:'100%', height:'100%',
         objectFit:'cover', objectPosition:'center',
-        pointerEvents:'none', opacity: 0.55,
+        pointerEvents:'none', opacity: 0.6,
       }} />
-      {/* Тёмный оверлей чтобы созвездия коллекции читались поверх фото */}
+      {/* Тёмный оверлей */}
       <div style={{
         position:'absolute', inset:0, pointerEvents:'none',
-        background:'linear-gradient(180deg, rgba(2,4,14,0.55) 0%, rgba(2,4,14,0.35) 40%, rgba(2,4,14,0.45) 100%)',
+        background:'linear-gradient(180deg, rgba(2,4,14,0.45) 0%, rgba(2,4,14,0.2) 40%, rgba(2,4,14,0.35) 100%)',
       }} />
+
+      {/* Мерцающие звёзды поверх фото */}
+      <svg style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'visible' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
+        {Array.from({length:35}).map((_,i) => {
+          const x = (i * 173.5 + 41) % 380;
+          const y = (i * 211.3 + i * 17) % 800;
+          const r = 0.7 + (i % 4) * 0.4;
+          const hiOp = 0.55 + (i % 5) * 0.09;
+          const loOp = 0.1 + (i % 3) * 0.06;
+          const dur = 2.2 + (i % 7) * 0.6;
+          const delay = -(i * 0.47) % dur;
+          const warm = i % 5 === 0;
+          return (
+            <circle key={i} cx={x} cy={y} r={r}
+              fill={warm ? '#fff8c0' : '#e8eeff'}
+              className="sky-twinkle"
+              style={{ '--op-hi': hiOp, '--op-lo': loOp, '--dur': `${dur}s`, '--delay': `${delay}s`, opacity: hiOp }}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Падающие звёзды */}
+      <svg style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
+        {[
+          { x: 280, y: 60,  dur: 3.5, delay: 0   },
+          { x: 80,  y: 120, dur: 4.8, delay: 1.9 },
+          { x: 340, y: 200, dur: 3.1, delay: 5.2 },
+          { x: 150, y: 30,  dur: 5.5, delay: 3.1 },
+          { x: 60,  y: 250, dur: 4.2, delay: 7.4 },
+        ].map((s, i) => (
+          <g key={i} className="sky-shoot"
+            style={{ '--dur': `${s.dur}s`, '--delay': `${s.delay}s`, transformOrigin: `${s.x}px ${s.y}px` }}>
+            {/* Хвост */}
+            <line x1={s.x} y1={s.y} x2={s.x - 38} y2={s.y - 12}
+              stroke="url(#shootGrad)" strokeWidth="1.2" strokeLinecap="round" opacity="0.85" />
+            {/* Голова */}
+            <circle cx={s.x} cy={s.y} r="1.4" fill="#fff" opacity="0.95" />
+          </g>
+        ))}
+        <defs>
+          <linearGradient id="shootGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#fff" stopOpacity="0" />
+            <stop offset="100%" stopColor="#fff" stopOpacity="0.9" />
+          </linearGradient>
+        </defs>
+      </svg>
 
       {/* Header */}
       <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:10, paddingTop:60, textAlign:'center', pointerEvents:'none' }}>
@@ -821,7 +868,7 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                 >
                   <svg viewBox="0 0 160 200" width={CELL} height={CELL} style={{ overflow:'visible', display:'block' }}>
                     {/* Линии созвездия */}
-                    <g stroke="rgba(212,175,55,0.28)" strokeWidth="1">
+                    <g stroke="rgba(212,175,55,0.55)" strokeWidth="1.2">
                       {(lines || []).map(([a, b], li) => {
                         const A = pts[a], B = pts[b];
                         if (!A || !B) return null;
@@ -833,11 +880,12 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                       const lit = si < starsLit;
                       return (
                         <g key={si}>
-                          {lit && <circle cx={p.x} cy={p.y} r="8" fill={paletteAccent} opacity="0.07" />}
+                          {lit && <circle cx={p.x} cy={p.y} r="12" fill="#E5C158" opacity="0.12" />}
+                          {lit && <circle cx={p.x} cy={p.y} r="6" fill="#E5C158" opacity="0.18" />}
                           <circle cx={p.x} cy={p.y}
-                            r={lit ? 3.2 : 1.8}
-                            fill={lit ? '#E5C158' : 'rgba(212,175,55,0.18)'}
-                            style={{ filter: lit ? 'drop-shadow(0 0 3px rgba(229,193,88,0.85))' : 'none' }}
+                            r={lit ? 3.8 : 2.0}
+                            fill={lit ? '#FFF0A0' : 'rgba(212,175,55,0.3)'}
+                            style={{ filter: lit ? 'drop-shadow(0 0 5px #FFD700) drop-shadow(0 0 2px #fff)' : 'none' }}
                           />
                         </g>
                       );
