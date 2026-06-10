@@ -757,108 +757,21 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
   return (
     <div style={{
       position:'absolute', inset:0, zIndex:50,
-      background:'radial-gradient(ellipse at 50% 30%, #0a1230 0%, #020408 100%)',
+      background:'#02040e',
       overflow:'hidden',
       touchAction:'none',
     }}>
-      {/* Фоновые звёзды + млечный путь — фиксированные */}
-      <svg style={{ position:'absolute', inset:0, pointerEvents:'none' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          {/* Внешнее мягкое свечение полосы */}
-          <linearGradient id="mwOuter" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#8899cc" stopOpacity="0" />
-            <stop offset="30%" stopColor="#aabbdd" stopOpacity="0.07" />
-            <stop offset="50%" stopColor="#ccd5ff" stopOpacity="0.12" />
-            <stop offset="70%" stopColor="#aabbdd" stopOpacity="0.07" />
-            <stop offset="100%" stopColor="#8899cc" stopOpacity="0" />
-          </linearGradient>
-          {/* Яркое ядро полосы */}
-          <linearGradient id="mwCore" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#ddeeff" stopOpacity="0" />
-            <stop offset="25%" stopColor="#eef4ff" stopOpacity="0.09" />
-            <stop offset="45%" stopColor="#ffffff" stopOpacity="0.18" />
-            <stop offset="55%" stopColor="#eef4ff" stopOpacity="0.13" />
-            <stop offset="75%" stopColor="#ddeeff" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="#ddeeff" stopOpacity="0" />
-          </linearGradient>
-          {/* Неровности вдоль полосы */}
-          <linearGradient id="mwFade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#000" stopOpacity="0.5" />
-            <stop offset="15%" stopColor="#000" stopOpacity="0" />
-            <stop offset="40%" stopColor="#000" stopOpacity="0.15" />
-            <stop offset="60%" stopColor="#000" stopOpacity="0" />
-            <stop offset="85%" stopColor="#000" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#000" stopOpacity="0.4" />
-          </linearGradient>
-          <filter id="mwBlurOuter"><feGaussianBlur stdDeviation="22" /></filter>
-          <filter id="mwBlurCore"><feGaussianBlur stdDeviation="8" /></filter>
-          <filter id="mwBlurThin"><feGaussianBlur stdDeviation="3" /></filter>
-        </defs>
-
-        {/* Млечный путь: 3 слоя — широкое свечение, ядро, тонкая нить */}
-        {/* Внешнее свечение — широкое и рассеянное */}
-        <rect x="-40" y="0" width="460" height="800" fill="url(#mwOuter)" filter="url(#mwBlurOuter)"
-          transform="rotate(20 190 400)" opacity="1" />
-        {/* Ядро полосы */}
-        <rect x="110" y="0" width="160" height="800" fill="url(#mwCore)" filter="url(#mwBlurCore)"
-          transform="rotate(20 190 400)" opacity="1" />
-        {/* Тонкая яркая нить по центру */}
-        <rect x="168" y="0" width="44" height="800" fill="url(#mwCore)" filter="url(#mwBlurThin)"
-          transform="rotate(20 190 400)" opacity="0.7" />
-        {/* Маска затухания сверху и снизу */}
-        <rect x="0" y="0" width="380" height="800" fill="url(#mwFade)" />
-
-        {/* Плотное облако мелких звёзд внутри полосы млечного пути */}
-        {Array.from({length:180}).map((_,i)=>{
-          // Звёзды вдоль диагональной полосы (смещение от центральной линии)
-          const t = (i * 4.37) % 800;
-          const centerX = 190 + (t - 400) * Math.tan(20 * Math.PI / 180);
-          const offset = ((i * 17.3) % 90) - 45;
-          const x = centerX + offset;
-          const y = t;
-          if (x < 0 || x > 380) return null;
-          const r = 0.2 + (i % 4) * 0.15;
-          const op = 0.12 + (i % 7) * 0.05;
-          return <circle key={`mw${i}`} cx={x} cy={y} r={r} fill="#e8eeff" opacity={op} />;
-        })}
-
-        {/* Фоновые звёзды — мелкие по всему небу */}
-        {Array.from({length:220}).map((_,i)=>{
-          const x = (i * 137.508 + 23) % 380;
-          const y = (i * 97.3 + i * 13.7) % 800;
-          const r = 0.22 + (i % 3) * 0.18;
-          const op = 0.07 + (i % 9) * 0.022;
-          return <circle key={`s${i}`} cx={x} cy={y} r={r} fill="#c8d4ff" opacity={op} />;
-        })}
-        {/* Средние звёзды */}
-        {Array.from({length:70}).map((_,i)=>{
-          const x = (i * 211.3 + 57) % 380;
-          const y = (i * 163.7 + i * 7.3) % 800;
-          const r = 0.45 + (i % 4) * 0.22;
-          const op = 0.12 + (i % 6) * 0.04;
-          const warm = i % 4 === 0;
-          return <circle key={`m${i}`} cx={x} cy={y} r={r} fill={warm ? '#fff3c0' : '#dde8ff'} opacity={op} />;
-        })}
-        {/* Крупные звёзды */}
-        {Array.from({length:22}).map((_,i)=>{
-          const x = (i * 317.1 + 91) % 380;
-          const y = (i * 251.9 + i * 31) % 800;
-          const r = 0.8 + (i % 3) * 0.35;
-          const op = 0.2 + (i % 4) * 0.07;
-          return <circle key={`l${i}`} cx={x} cy={y} r={r} fill="#ffffff" opacity={op} />;
-        })}
-        {/* Звёзды с ореолом */}
-        {Array.from({length:12}).map((_,i)=>{
-          const x = (i * 373 + 140) % 380;
-          const y = (i * 293 + i * 53) % 800;
-          return (
-            <g key={`g${i}`}>
-              <circle cx={x} cy={y} r={3.5} fill="#fff" opacity={0.035} />
-              <circle cx={x} cy={y} r={1.1} fill="#fff" opacity={0.25} />
-            </g>
-          );
-        })}
-      </svg>
+      {/* Фото ночного неба — фиксированный фон */}
+      <img src="sky-bg.avif" style={{
+        position:'absolute', inset:0, width:'100%', height:'100%',
+        objectFit:'cover', objectPosition:'center',
+        pointerEvents:'none', opacity: 0.55,
+      }} />
+      {/* Тёмный оверлей чтобы созвездия коллекции читались поверх фото */}
+      <div style={{
+        position:'absolute', inset:0, pointerEvents:'none',
+        background:'linear-gradient(180deg, rgba(2,4,14,0.55) 0%, rgba(2,4,14,0.35) 40%, rgba(2,4,14,0.45) 100%)',
+      }} />
 
       {/* Header */}
       <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:10, paddingTop:60, textAlign:'center', pointerEvents:'none' }}>
