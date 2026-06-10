@@ -1174,12 +1174,13 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const cellIdx = (r, c) => r * size + c;
 
   // Ошибки для подсветки
-  const errors = _uM_q(() => {
+  const { errors, hint } = _uM_q(() => {
     const errs = new Set();
-    if (cells.length !== size * size) return errs; // защита от рассинхрона при смене уровня
+    if (cells.length !== size * size) return { errors: errs, hint: '' };
+    let hintMsg = '';
     // Проверка строк: незачёркнутые числа не должны повторяться
     for (let r = 0; r < size; r++) {
-      const seen = new Map(); // value -> [indices]
+      const seen = new Map();
       for (let c = 0; c < size; c++) {
         if (cells[cellIdx(r, c)] === true) continue;
         const v = GRID[r][c];
@@ -1213,7 +1214,33 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         }
       }
     }
-    return errs;
+    // Проверка связности незачёркнутых (flood fill)
+    const visible = [];
+    for (let i = 0; i < size * size; i++) { if (cells[i] !== true) visible.push(i); }
+    if (visible.length > 0) {
+      const visited = new Set();
+      const queue = [visible[0]];
+      visited.add(visible[0]);
+      while (queue.length) {
+        const idx = queue.shift();
+        const r = Math.floor(idx / size), c = idx % size;
+        for (const [nr, nc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]) {
+          if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+          const ni = cellIdx(nr, nc);
+          if (cells[ni] === true || visited.has(ni)) continue;
+          visited.add(ni); queue.push(ni);
+        }
+      }
+      if (visited.size !== visible.length) {
+        // Изолированные ячейки подсвечиваем
+        visible.forEach(i => { if (!visited.has(i)) errs.add(i); });
+        hintMsg = lang === 'en' ? '· isolated cells — all white must be connected ·' : '· есть оторванные клетки — все незачёркнутые должны быть связаны ·';
+      }
+    }
+    if (errs.size > 0 && !hintMsg) {
+      hintMsg = lang === 'en' ? '· duplicate numbers in a row or column ·' : '· повторяющиеся числа в строке или столбце ·';
+    }
+    return { errors: errs, hint: hintMsg };
   }, [cells]);
 
   // Победа — проверяем правила Хитори, а не конкретное решение
@@ -1391,9 +1418,13 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
 
         {/* Подсказка */}
         <text x={W/2} y={PAD_TOP + size*CELL + 22} textAnchor="middle"
-          fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="15"
-          fill="rgba(212,175,55,0.85)">
-          {solved ? '· Hitori solutum ·' : lang === 'en' ? '· Tap to cross out · tap again to clear ·' : '· Тап — зачеркнуть · ещё раз — убрать ·'}
+          fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="13"
+          fill={hint ? '#FF6B6B' : 'rgba(212,175,55,0.85)'}>
+          {solved
+            ? '· Hitori solutum ·'
+            : hint
+              ? hint
+              : lang === 'en' ? '· Tap to cross out · tap again to clear ·' : '· Тап — зачеркнуть · ещё раз — убрать ·'}
         </text>
       </svg>
     </div>
