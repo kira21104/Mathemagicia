@@ -761,64 +761,6 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       overflow:'hidden',
       touchAction:'none',
     }}>
-      {/* Фото ночного неба */}
-      <img src="sky-bg.avif" style={{
-        position:'absolute', inset:0, width:'100%', height:'100%',
-        objectFit:'cover', objectPosition:'center',
-        pointerEvents:'none', opacity: 0.6,
-      }} />
-      {/* Тёмный оверлей */}
-      <div style={{
-        position:'absolute', inset:0, pointerEvents:'none',
-        background:'linear-gradient(180deg, rgba(2,4,14,0.45) 0%, rgba(2,4,14,0.2) 40%, rgba(2,4,14,0.35) 100%)',
-      }} />
-
-      {/* Мерцающие звёзды поверх фото */}
-      <svg style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'visible' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
-        {Array.from({length:35}).map((_,i) => {
-          const x = (i * 173.5 + 41) % 380;
-          const y = (i * 211.3 + i * 17) % 800;
-          const r = 0.7 + (i % 4) * 0.4;
-          const hiOp = 0.55 + (i % 5) * 0.09;
-          const loOp = 0.1 + (i % 3) * 0.06;
-          const dur = 2.2 + (i % 7) * 0.6;
-          const delay = -(i * 0.47) % dur;
-          const warm = i % 5 === 0;
-          return (
-            <circle key={i} cx={x} cy={y} r={r}
-              fill={warm ? '#fff8c0' : '#e8eeff'}
-              className="sky-twinkle"
-              style={{ '--op-hi': hiOp, '--op-lo': loOp, '--dur': `${dur}s`, '--delay': `${delay}s`, opacity: hiOp }}
-            />
-          );
-        })}
-      </svg>
-
-      {/* Падающие звёзды */}
-      <svg style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }} width="100%" height="100%" viewBox="0 0 380 800" preserveAspectRatio="xMidYMid slice">
-        {[
-          { x: 280, y: 60,  dur: 3.5, delay: 0   },
-          { x: 80,  y: 120, dur: 4.8, delay: 1.9 },
-          { x: 340, y: 200, dur: 3.1, delay: 5.2 },
-          { x: 150, y: 30,  dur: 5.5, delay: 3.1 },
-          { x: 60,  y: 250, dur: 4.2, delay: 7.4 },
-        ].map((s, i) => (
-          <g key={i} className="sky-shoot"
-            style={{ '--dur': `${s.dur}s`, '--delay': `${s.delay}s`, transformOrigin: `${s.x}px ${s.y}px` }}>
-            {/* Хвост */}
-            <line x1={s.x} y1={s.y} x2={s.x - 38} y2={s.y - 12}
-              stroke="url(#shootGrad)" strokeWidth="1.2" strokeLinecap="round" opacity="0.85" />
-            {/* Голова */}
-            <circle cx={s.x} cy={s.y} r="1.4" fill="#fff" opacity="0.95" />
-          </g>
-        ))}
-        <defs>
-          <linearGradient id="shootGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#fff" stopOpacity="0" />
-            <stop offset="100%" stopColor="#fff" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-      </svg>
 
       {/* Header */}
       <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:10, paddingTop:60, textAlign:'center', pointerEvents:'none' }}>
@@ -842,23 +784,32 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
       )}
 
       {/* Полотно с созвездиями */}
-      {allItems.length > 0 && (
-        <div
-          ref={containerRef}
-          style={{ position:'absolute', inset:0, touchAction:'none', cursor:'grab' }}
-          onPointerDown={onPtrDown}
-          onPointerMove={onPtrMove}
-          onPointerUp={onPtrUp}
-          onPointerLeave={onPtrUp}
-          onPointerCancel={onPtrUp}
-        >
-          {/* Трансформируемый слой */}
+      <div
+        ref={containerRef}
+        style={{ position:'absolute', inset:0, touchAction:'none', cursor:'grab' }}
+        onPointerDown={onPtrDown}
+        onPointerMove={onPtrMove}
+        onPointerUp={onPtrUp}
+        onPointerLeave={onPtrUp}
+        onPointerCancel={onPtrUp}
+      >
+        {/* Трансформируемый слой — фон + созвездия зумятся вместе */}
+        <div style={{
+          position:'absolute', left: pan.x, top: pan.y,
+          transform: `scale(${zoom})`, transformOrigin: '0 0',
+          willChange: 'transform',
+        }}>
+          {/* Фон — большое полотно чтобы при зуме не было краёв */}
           <div style={{
-            position:'absolute', left: pan.x, top: pan.y,
-            transform: `scale(${zoom})`, transformOrigin: '0 0',
-            willChange: 'transform',
-          }}>
-            {placed.map(({ pts, lines, ru, en, la, starsLit, id, wx, wy }) => {
+            position:'absolute',
+            left: -2000, top: -2000, width: 6000, height: 6000,
+            backgroundImage: 'url(sky-bg.jpg)',
+            backgroundSize: '1440px 900px',
+            backgroundRepeat: 'repeat',
+            opacity: 0.75,
+            pointerEvents: 'none',
+          }} />
+          {placed.map(({ pts, lines, ru, en, la, starsLit, id, wx, wy }) => {
               const isActive = activeId === id;
               const name = lang === 'en' ? (en || ru) : ru;
               return (
@@ -921,10 +872,9 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
                   )}
                 </div>
               );
-            })}
-          </div>
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }

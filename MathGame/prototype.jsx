@@ -183,8 +183,17 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
   const setLangPersist = (l) => { localStorage.setItem('mathgame_lang', l); setLang(l); };
   const [paletteAccent, setPaletteAccent] = _uS_p(paletteAccentOverride || '#4DEEEA');
   const [theme, setTheme] = _uS_p(variant);
-  // Счётчик пройденных уровней по каждой главе (0 = не начата)
-  const [chapterLevels, setChapterLevels] = _uS_p([0, 0, 0, 0, 0, 0]);
+  // Счётчик пройденных уровней по каждой главе (0 = не начата) — персистентный
+  const [chapterLevels, setChapterLevels] = _uS_p(() => {
+    try {
+      const saved = localStorage.getItem('mathgame_levels');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 6) return parsed;
+      }
+    } catch(e) {}
+    return [0, 0, 0, 0, 0, 0];
+  });
   const [difficulty, setDifficulty] = _uS_p('normal');
   // Тёмная накладка поверх всего — независима от смены экрана
   const [coverBlack, setCoverBlack] = _uS_p(false);
@@ -206,6 +215,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
     setChapterLevels(prev => {
       const next = [...prev];
       next[ci] = (next[ci] || 0) + 1;
+      try { localStorage.setItem('mathgame_levels', JSON.stringify(next)); } catch(e) {}
       return next;
     });
   };
