@@ -608,8 +608,10 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
 
   if (total === 0) return null;
 
-  const CARD_W = 300;
+  const CARD_W = 220;
   const GAP = 14;
+  const SVG_SIZE = 180; // квадратная область рисунка
+  const PAD = 18; // отступ внутри viewBox чтобы ореолы не обрезались
 
   return (
     <div style={{ userSelect:'none' }}>
@@ -622,7 +624,15 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
           transition: 'transform 0.3s ease',
           willChange: 'transform',
         }}>
-          {constellations.map(({ pts, lines, ru, en, la, starsLit }, ci) => (
+          {constellations.map(({ pts, lines, ru, en, la, starsLit }, ci) => {
+            // Вычисляем bounding box по реальным координатам точек
+            const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+            const minX = Math.min(...xs) - PAD, maxX = Math.max(...xs) + PAD;
+            const minY = Math.min(...ys) - PAD, maxY = Math.max(...ys) + PAD;
+            const vbW = maxX - minX, vbH = maxY - minY;
+            const viewBox = `${minX} ${minY} ${vbW} ${vbH}`;
+
+            return (
             <div key={ci} style={{
               flexShrink: 0, width: CARD_W,
               display:'flex', flexDirection:'column', alignItems:'center',
@@ -634,7 +644,7 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
               {/* Название над рисунком */}
               <div style={{
                 fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-                fontSize:15, color:'rgba(229,193,88,0.95)', textAlign:'center',
+                fontSize:14, color:'rgba(229,193,88,0.95)', textAlign:'center',
                 lineHeight:1.25, marginBottom: 4,
               }}>{lang === 'en' ? (en || ru) : ru}</div>
               {la && (
@@ -644,9 +654,8 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
                 }}>{la}</div>
               )}
 
-              {/* Рисунок созвездия */}
-              <svg viewBox="0 0 160 200" width="220" height="180" style={{ overflow:'visible' }}>
-                {/* Линии — ярче */}
+              {/* Рисунок созвездия — viewBox подогнан под реальные координаты */}
+              <svg viewBox={viewBox} width={SVG_SIZE} height={SVG_SIZE} style={{ overflow:'visible' }}>
                 <g stroke="rgba(212,175,55,0.55)" strokeWidth="1.4">
                   {(lines || []).map(([a, b], li) => {
                     const A = pts[a], B = pts[b];
@@ -670,7 +679,8 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
                 })}
               </svg>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
