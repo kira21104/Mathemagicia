@@ -636,39 +636,52 @@ function skyLayoutConstellations(items) {
 function SkyBackground() {
   const W = 6000, H = 6000;
 
-  const { stars, bright, nebulae } = _uM_s(() => {
+  const { stars, bright, nebulae, dustBands } = _uM_s(() => {
     let s = 7919;
     const rng = () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
 
-    // 500 обычных звёзд — равномерно по всему полотну
-    const stars = Array.from({ length: 500 }, () => ({
+    // 1800 обычных звёзд — гуще в центре «млечного пути»
+    const stars = Array.from({ length: 1800 }, () => {
+      // Небольшое смещение плотности к диагональной полосе
+      const x = Math.round(rng() * W);
+      const y = Math.round(rng() * H);
+      const distToband = Math.abs((x + y) / 2 - H * 0.5) / H;
+      const inBand = distToband < 0.25;
+      // Звёзды в полосе чуть чаще и ярче
+      const r = inBand ? 0.3 + rng() * 1.2 : 0.3 + rng() * 0.9;
+      const op = inBand ? 0.3 + rng() * 0.65 : 0.15 + rng() * 0.45;
+      // Лёгкий оттенок: большинство белые/голубые, редко тёплые
+      const hue = rng() < 0.15 ? '#ffe8c0' : rng() < 0.1 ? '#c0d8ff' : '#e8eeff';
+      return { x, y, r, op, hue };
+    });
+
+    // 8 ярких акцентных звёзд с мерцанием
+    const bright = Array.from({ length: 8 }, (_, i) => ({
       x: Math.round(rng() * W),
       y: Math.round(rng() * H),
-      r: 0.4 + rng() * 1.4,
-      op: 0.25 + rng() * 0.6,
+      r: 2.0 + rng() * 1.4,
+      delay: i * 0.7,
     }));
 
-    // 6 ярких акцентных звёзд с мерцанием
-    const bright = Array.from({ length: 6 }, (_, i) => ({
-      x: Math.round(rng() * W),
-      y: Math.round(rng() * H),
-      r: 2.2 + rng() * 1.2,
-      delay: i * 0.9,
-    }));
-
-    // 4 туманности — размытые цветные пятна
-    const cols = ['#1a3a6a', '#0d2a50', '#1a2240', '#0a1830'];
-    const nebulae = Array.from({ length: 4 }, (_, i) => ({
-      cx: 500 + Math.round(rng() * (W - 1000)),
-      cy: 500 + Math.round(rng() * (H - 1000)),
-      rx: 400 + Math.round(rng() * 600),
-      ry: 200 + Math.round(rng() * 400),
-      rot: Math.round(rng() * 60 - 30),
+    // 7 туманностей — разные цвета и размеры для объёма
+    const cols = ['#1a3a6a','#0d2050','#1a1040','#0a1830','#12203a','#1e1035','#0d1820'];
+    const nebulae = Array.from({ length: 7 }, (_, i) => ({
+      cx: 400 + Math.round(rng() * (W - 800)),
+      cy: 400 + Math.round(rng() * (H - 800)),
+      rx: 300 + Math.round(rng() * 800),
+      ry: 150 + Math.round(rng() * 500),
+      rot: Math.round(rng() * 80 - 40),
       col: cols[i],
-      op: 0.08 + rng() * 0.08,
+      op: 0.10 + rng() * 0.12,
     }));
 
-    return { stars, bright, nebulae };
+    // 2 диагональные пылевые полосы — имитация млечного пути
+    const dustBands = [
+      { x1: 0, y1: H * 0.2, x2: W, y2: H * 0.65, w: 420, op: 0.07, col: '#1a3050' },
+      { x1: 0, y1: H * 0.35, x2: W, y2: H * 0.8, w: 260, op: 0.05, col: '#0d1a30' },
+    ];
+
+    return { stars, bright, nebulae, dustBands };
   }, []);
 
   return (
@@ -678,19 +691,31 @@ function SkyBackground() {
       viewBox={`0 0 ${W} ${H}`}
     >
       <defs>
-        <filter id="neb-blur">
-          <feGaussianBlur stdDeviation="80" />
-        </filter>
+        <filter id="neb-blur"><feGaussianBlur stdDeviation="90" /></filter>
+        <filter id="dust-blur"><feGaussianBlur stdDeviation="120" /></filter>
+        <radialGradient id="bg-grad" cx="50%" cy="45%" r="70%">
+          <stop offset="0%" stopColor="#06102a" />
+          <stop offset="50%" stopColor="#040c1e" />
+          <stop offset="100%" stopColor="#020408" />
+        </radialGradient>
         <style>{`
           @keyframes twinkle-sky {
-            0%,100% { opacity:0.9; r:2.8px; }
-            50% { opacity:0.35; r:1.8px; }
+            0%,100% { opacity:0.95; }
+            50% { opacity:0.25; }
           }
         `}</style>
       </defs>
 
-      {/* Фон */}
-      <rect width={W} height={H} fill="#02040e" />
+      {/* Фон — не чёрный, тёмно-синий градиент */}
+      <rect width={W} height={H} fill="url(#bg-grad)" />
+
+      {/* Пылевые полосы млечного пути */}
+      {dustBands.map((d, i) => (
+        <line key={i} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+          stroke={d.col} strokeWidth={d.w} opacity={d.op}
+          filter="url(#dust-blur)"
+        />
+      ))}
 
       {/* Туманности */}
       {nebulae.map((n, i) => (
@@ -704,13 +729,13 @@ function SkyBackground() {
 
       {/* Обычные звёзды */}
       {stars.map((st, i) => (
-        <circle key={i} cx={st.x} cy={st.y} r={st.r} fill="#d8e8ff" opacity={st.op} />
+        <circle key={i} cx={st.x} cy={st.y} r={st.r} fill={st.hue} opacity={st.op} />
       ))}
 
       {/* Яркие мерцающие акценты */}
       {bright.map((b, i) => (
         <circle key={i} cx={b.x} cy={b.y} r={b.r} fill="#fff8e0"
-          style={{ animation: `twinkle-sky ${3 + i * 0.7}s ease-in-out ${b.delay}s infinite` }}
+          style={{ animation: `twinkle-sky ${3.5 + i * 0.6}s ease-in-out ${b.delay}s infinite` }}
         />
       ))}
     </svg>
