@@ -632,6 +632,91 @@ function skyLayoutConstellations(items) {
   }));
 }
 
+// Генератор звёздного неба — рисуется один раз, не пересчитывается
+function SkyBackground() {
+  const W = 6000, H = 6000;
+
+  const { stars, bright, nebulae } = _uM_s(() => {
+    let s = 7919;
+    const rng = () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
+
+    // 500 обычных звёзд — равномерно по всему полотну
+    const stars = Array.from({ length: 500 }, () => ({
+      x: Math.round(rng() * W),
+      y: Math.round(rng() * H),
+      r: 0.4 + rng() * 1.4,
+      op: 0.25 + rng() * 0.6,
+    }));
+
+    // 6 ярких акцентных звёзд с мерцанием
+    const bright = Array.from({ length: 6 }, (_, i) => ({
+      x: Math.round(rng() * W),
+      y: Math.round(rng() * H),
+      r: 2.2 + rng() * 1.2,
+      delay: i * 0.9,
+    }));
+
+    // 4 туманности — размытые цветные пятна
+    const cols = ['#1a3a6a', '#0d2a50', '#1a2240', '#0a1830'];
+    const nebulae = Array.from({ length: 4 }, (_, i) => ({
+      cx: 500 + Math.round(rng() * (W - 1000)),
+      cy: 500 + Math.round(rng() * (H - 1000)),
+      rx: 400 + Math.round(rng() * 600),
+      ry: 200 + Math.round(rng() * 400),
+      rot: Math.round(rng() * 60 - 30),
+      col: cols[i],
+      op: 0.08 + rng() * 0.08,
+    }));
+
+    return { stars, bright, nebulae };
+  }, []);
+
+  return (
+    <svg
+      style={{ position:'absolute', left: -2000, top: -2000, pointerEvents:'none' }}
+      width={W} height={H}
+      viewBox={`0 0 ${W} ${H}`}
+    >
+      <defs>
+        <filter id="neb-blur">
+          <feGaussianBlur stdDeviation="80" />
+        </filter>
+        <style>{`
+          @keyframes twinkle-sky {
+            0%,100% { opacity:0.9; r:2.8px; }
+            50% { opacity:0.35; r:1.8px; }
+          }
+        `}</style>
+      </defs>
+
+      {/* Фон */}
+      <rect width={W} height={H} fill="#02040e" />
+
+      {/* Туманности */}
+      {nebulae.map((n, i) => (
+        <ellipse key={i}
+          cx={n.cx} cy={n.cy} rx={n.rx} ry={n.ry}
+          fill={n.col} opacity={n.op}
+          transform={`rotate(${n.rot} ${n.cx} ${n.cy})`}
+          filter="url(#neb-blur)"
+        />
+      ))}
+
+      {/* Обычные звёзды */}
+      {stars.map((st, i) => (
+        <circle key={i} cx={st.x} cy={st.y} r={st.r} fill="#d8e8ff" opacity={st.op} />
+      ))}
+
+      {/* Яркие мерцающие акценты */}
+      {bright.map((b, i) => (
+        <circle key={i} cx={b.x} cy={b.y} r={b.r} fill="#fff8e0"
+          style={{ animation: `twinkle-sky ${3 + i * 0.7}s ease-in-out ${b.delay}s infinite` }}
+        />
+      ))}
+    </svg>
+  );
+}
+
 function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, lang = 'ru', onClose }) {
   const t = useT(lang);
   const LEVELS_PER_PAGE = 6;
@@ -799,16 +884,8 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
           transform: `scale(${zoom})`, transformOrigin: '0 0',
           willChange: 'transform',
         }}>
-          {/* Фон — большое полотно чтобы при зуме не было краёв */}
-          <div style={{
-            position:'absolute',
-            left: -2000, top: -2000, width: 6000, height: 6000,
-            backgroundImage: 'url(sky-bg.jpg)',
-            backgroundSize: '1440px 900px',
-            backgroundRepeat: 'repeat',
-            opacity: 0.75,
-            pointerEvents: 'none',
-          }} />
+          {/* Фон — SVG звёздное небо */}
+          <SkyBackground />
           {placed.map(({ pts, lines, ru, en, la, starsLit, id, wx, wy }) => {
               const isActive = activeId === id;
               const name = lang === 'en' ? (en || ru) : ru;
