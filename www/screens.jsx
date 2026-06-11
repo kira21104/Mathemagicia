@@ -608,8 +608,8 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
 
   if (total === 0) return null;
 
-  const CARD_W = 200;
-  const GAP = 12;
+  const CARD_W = 300;
+  const GAP = 14;
 
   return (
     <div style={{ userSelect:'none' }}>
@@ -626,27 +626,28 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
             <div key={ci} style={{
               flexShrink: 0, width: CARD_W,
               display:'flex', flexDirection:'column', alignItems:'center',
-              background:'rgba(8,12,28,0.82)',
-              border:'1px solid rgba(212,175,55,0.25)',
-              borderRadius:12,
-              padding:'10px 10px 8px',
+              background:'rgba(8,12,28,0.85)',
+              border:'1px solid rgba(212,175,55,0.3)',
+              borderRadius:14,
+              padding:'14px 14px 12px',
             }}>
               {/* Название над рисунком */}
               <div style={{
                 fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-                fontSize:13, color:'rgba(229,193,88,0.9)', textAlign:'center',
-                lineHeight:1.25, marginBottom: 6,
+                fontSize:15, color:'rgba(229,193,88,0.95)', textAlign:'center',
+                lineHeight:1.25, marginBottom: 4,
               }}>{lang === 'en' ? (en || ru) : ru}</div>
               {la && (
                 <div style={{
-                  fontFamily:'Comfortaa, sans-serif', fontSize:8, letterSpacing:0.5,
-                  color:'rgba(212,175,55,0.4)', textAlign:'center', marginBottom: 8,
+                  fontFamily:'Comfortaa, sans-serif', fontSize:9, letterSpacing:0.5,
+                  color:'rgba(212,175,55,0.5)', textAlign:'center', marginBottom: 10,
                 }}>{la}</div>
               )}
 
               {/* Рисунок созвездия */}
-              <svg viewBox="0 0 160 200" width="140" height="120" style={{ overflow:'visible' }}>
-                <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
+              <svg viewBox="0 0 160 200" width="220" height="180" style={{ overflow:'visible' }}>
+                {/* Линии — ярче */}
+                <g stroke="rgba(212,175,55,0.55)" strokeWidth="1.4">
                   {(lines || []).map(([a, b], li) => {
                     const A = pts[a], B = pts[b];
                     if (!A || !B) return null;
@@ -657,11 +658,12 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
                   const lit = si < starsLit;
                   return (
                     <g key={si}>
-                      {lit && <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />}
+                      {lit && <circle cx={p.x} cy={p.y} r="14" fill="#E5C158" opacity="0.10" />}
+                      {lit && <circle cx={p.x} cy={p.y} r="7" fill="#E5C158" opacity="0.20" />}
                       <circle cx={p.x} cy={p.y}
-                        r={lit ? 3.8 : 2}
-                        fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
-                        style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
+                        r={lit ? 4.5 : 2.2}
+                        fill={lit ? '#FFF0A0' : 'rgba(212,175,55,0.2)'}
+                        style={{ filter: lit ? 'drop-shadow(0 0 6px #FFD700) drop-shadow(0 0 3px #fff)' : 'none' }}
                       />
                     </g>
                   );
