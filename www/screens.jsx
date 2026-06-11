@@ -607,87 +607,83 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
   };
 
   if (total === 0) return null;
-  const { pts, lines, ru, en, la, starsLit } = constellations[idx];
+
+  const CARD_W = 200;
+  const GAP = 12;
 
   return (
-    <div style={{ userSelect:'none' }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      {/* Карточка */}
-      <div style={{
-        display:'flex', flexDirection:'column', alignItems:'center',
-        background:'rgba(8,12,28,0.82)',
-        border:'1px solid rgba(212,175,55,0.25)',
-        borderRadius:12,
-        padding:'10px 10px 8px',
-        margin:'0 auto',
-        width: 200,
-        position:'relative',
-      }}>
-        {/* Стрелки — только если больше одной карточки */}
-        {total > 1 && (
-          <>
-            <button className="btn-reset" onClick={prev} disabled={idx === 0} style={{
-              position:'absolute', left:6, top:'50%', transform:'translateY(-50%)',
-              color: idx === 0 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
-              fontSize:18, lineHeight:1,
-            }}>‹</button>
-            <button className="btn-reset" onClick={next} disabled={idx === total - 1} style={{
-              position:'absolute', right:6, top:'50%', transform:'translateY(-50%)',
-              color: idx === total - 1 ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.7)',
-              fontSize:18, lineHeight:1,
-            }}>›</button>
-          </>
-        )}
-
-        <svg viewBox="0 0 160 200" width="140" height="120" style={{ overflow:'visible' }}>
-          <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
-            {(lines || []).map(([a, b], li) => {
-              const A = pts[a], B = pts[b];
-              if (!A || !B) return null;
-              return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
-            })}
-          </g>
-          {pts.map((p, si) => {
-            const lit = si < starsLit;
-            return (
-              <g key={si}>
-                {lit && <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />}
-                <circle cx={p.x} cy={p.y}
-                  r={lit ? 3.8 : 2}
-                  fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
-                  style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
-                />
-              </g>
-            );
-          })}
-        </svg>
-
+    <div style={{ userSelect:'none' }}>
+      {/* Скользящая лента карточек */}
+      <div style={{ overflow:'hidden', width: CARD_W, margin:'0 auto' }}
+        onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div style={{
-          fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-          fontSize:13, color:'rgba(229,193,88,0.9)', textAlign:'center',
-          marginTop:4, lineHeight:1.25,
-        }}>{lang === 'en' ? (en || ru) : ru}</div>
-        {la && (
-          <div style={{
-            fontFamily:'Comfortaa, sans-serif', fontSize:8, letterSpacing:0.5,
-            color:'rgba(212,175,55,0.4)', marginTop:2, textAlign:'center',
-          }}>{la}</div>
-        )}
+          display:'flex', gap: GAP,
+          transform: `translateX(-${idx * (CARD_W + GAP)}px)`,
+          transition: 'transform 0.3s ease',
+          willChange: 'transform',
+        }}>
+          {constellations.map(({ pts, lines, ru, en, la, starsLit }, ci) => (
+            <div key={ci} style={{
+              flexShrink: 0, width: CARD_W,
+              display:'flex', flexDirection:'column', alignItems:'center',
+              background:'rgba(8,12,28,0.82)',
+              border:'1px solid rgba(212,175,55,0.25)',
+              borderRadius:12,
+              padding:'10px 10px 8px',
+            }}>
+              {/* Название над рисунком */}
+              <div style={{
+                fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
+                fontSize:13, color:'rgba(229,193,88,0.9)', textAlign:'center',
+                lineHeight:1.25, marginBottom: 6,
+              }}>{lang === 'en' ? (en || ru) : ru}</div>
+              {la && (
+                <div style={{
+                  fontFamily:'Comfortaa, sans-serif', fontSize:8, letterSpacing:0.5,
+                  color:'rgba(212,175,55,0.4)', textAlign:'center', marginBottom: 8,
+                }}>{la}</div>
+              )}
 
-        {/* Пагинация точками */}
-        {total > 1 && (
-          <div style={{ display:'flex', gap:5, marginTop:8 }}>
-            {Array.from({ length: total }, (_, i) => (
-              <button key={i} className="btn-reset" onClick={() => setIdx(i)} style={{
-                width: i === idx ? 14 : 6,
-                height: 6,
-                borderRadius: 3,
-                background: i === idx ? paletteAccent : 'rgba(212,175,55,0.25)',
-                transition: 'all 0.25s ease',
-              }} />
-            ))}
-          </div>
-        )}
+              {/* Рисунок созвездия */}
+              <svg viewBox="0 0 160 200" width="140" height="120" style={{ overflow:'visible' }}>
+                <g stroke="rgba(212,175,55,0.22)" strokeWidth="1">
+                  {(lines || []).map(([a, b], li) => {
+                    const A = pts[a], B = pts[b];
+                    if (!A || !B) return null;
+                    return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
+                  })}
+                </g>
+                {pts.map((p, si) => {
+                  const lit = si < starsLit;
+                  return (
+                    <g key={si}>
+                      {lit && <circle cx={p.x} cy={p.y} r="7" fill={paletteAccent} opacity="0.08" />}
+                      <circle cx={p.x} cy={p.y}
+                        r={lit ? 3.8 : 2}
+                        fill={lit ? '#E5C158' : 'rgba(212,175,55,0.15)'}
+                        style={{ filter: lit ? 'drop-shadow(0 0 4px rgba(229,193,88,0.9))' : 'none' }}
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Пагинация точками под лентой */}
+      {total > 1 && (
+        <div style={{ display:'flex', justifyContent:'center', gap:5, marginTop:8 }}>
+          {Array.from({ length: total }, (_, i) => (
+            <button key={i} className="btn-reset" onClick={() => setIdx(i)} style={{
+              width: i === idx ? 14 : 6, height: 6, borderRadius: 3,
+              background: i === idx ? paletteAccent : 'rgba(212,175,55,0.25)',
+              transition: 'all 0.25s ease',
+            }} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
