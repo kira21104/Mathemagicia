@@ -903,6 +903,8 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
         setSolved(true);
         SFX && SFX.win(); VIB && VIB.win();
         setTimeout(() => onWin && onWin(), 1400);
+      } else if (!ok) {
+        SFX && SFX.error(); VIB && VIB.error();
       }
     }
   }, [placement]);
@@ -955,7 +957,8 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
           ? { ...pc, x: NODES[tgtNode].x, y: NODES[tgtNode].y, placedNode: tgtNode }
           : pc);
       }
-      // Вернуть домой
+      // Вернуть домой — не попал в узел
+      SFX && SFX.error(); VIB && VIB.error();
       return ps.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placedNode: null } : pc);
     });
   };
@@ -1422,18 +1425,53 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     return cur === null ? true : null;
   };
 
+  // Быстрая проверка ошибок на новом состоянии — для звука
+  const hasErrorsInState = (nextCells) => {
+    for (let r = 0; r < size; r++) {
+      const seen = new Set();
+      for (let c = 0; c < size; c++) {
+        if (nextCells[cellIdx(r, c)] === true) continue;
+        const v = GRID[r][c];
+        if (seen.has(v)) return true;
+        seen.add(v);
+      }
+    }
+    for (let c = 0; c < size; c++) {
+      const seen = new Set();
+      for (let r = 0; r < size; r++) {
+        if (nextCells[cellIdx(r, c)] === true) continue;
+        const v = GRID[r][c];
+        if (seen.has(v)) return true;
+        seen.add(v);
+      }
+    }
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (nextCells[cellIdx(r, c)] !== true) continue;
+        if (c < size - 1 && nextCells[cellIdx(r, c + 1)] === true) return true;
+        if (r < size - 1 && nextCells[cellIdx(r + 1, c)] === true) return true;
+      }
+    }
+    return false;
+  };
+
   const onPointerDown = (e) => {
     if (solved) return;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch(_) {}
     const p = svgPt(e.clientX, e.clientY);
     const cell = ptToCell(p.x, p.y);
     if (!cell) return;
-    SFX && SFX.tap(); VIB && VIB.tap();
     const nextVal = cycleCell(cell.r, cell.c);
     dragModeRef.current = { fill: nextVal };
     setCells(prev => {
       const next = [...prev];
       next[cellIdx(cell.r, cell.c)] = nextVal;
+      // Если зачеркнули и это создало ошибку — error, иначе tap
+      if (nextVal === true && hasErrorsInState(next)) {
+        SFX && SFX.error(); VIB && VIB.error();
+      } else {
+        SFX && SFX.tap(); VIB && VIB.tap();
+      }
       return next;
     });
   };
