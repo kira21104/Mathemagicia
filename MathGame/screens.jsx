@@ -910,7 +910,7 @@ const CHAPTER_RULES = {
     'Найдите все безопасные звёзды, не задев тёмные. Тап — открыть клетку. Долгое нажатие — поставить метку ✦ (звезда), ещё раз — знак ?, ещё раз — снять метку.',
     'Закрасьте клетки по числовым подсказкам рядом с каждой строкой и столбцом. Число означает сколько клеток закрашено подряд в этом ряду. Несколько чисел — несколько групп, между ними хотя бы одна пустая.',
     'Расставьте числа 1–10 в узлы пятиконечной звезды так, чтобы сумма по каждому лучу (4 узла) равнялась 22. Нажмите на число в банке, затем на узел звезды.',
-    'Зачеркните некоторые числа по правилам: в каждой строке и столбце не должно быть двух одинаковых незачёркнутых чисел; зачёркнутые клетки не должны касаться друг друга по горизонтали или вертикали.',
+    'Правила Хитори:\n\n1. В каждой строке и каждом столбце не должно быть двух одинаковых незачёркнутых чисел.\n\n2. Зачёркнутые клетки не могут стоять рядом — ни по горизонтали, ни по вертикали.\n\n3. Все незачёркнутые клетки должны быть связаны — образовывать единую область без разрывов.\n\nКак играть: тапните клетку чтобы зачеркнуть, ещё раз — убрать зачёркивание. Красный цвет — дубликат в строке или столбце. Оранжевый — клетка оторвана от остальных. Голубой — подсказка.',
   ],
   en: [
     null,
@@ -918,7 +918,7 @@ const CHAPTER_RULES = {
     'Find all safe stars without hitting dark ones. Tap to reveal. Long-press to mark ✦, again for ?, again to clear.',
     'Fill cells following the number clues beside each row and column. A number means that many consecutive filled cells. Multiple numbers mean multiple groups with at least one gap between.',
     'Place numbers 1–10 in the star nodes so each ray of 4 nodes sums to 22. Tap a number in the bank, then tap a node to place it.',
-    'Cross out numbers so that: no row or column has two identical uncrossed numbers; crossed cells do not touch each other horizontally or vertically.',
+    'Hitori rules:\n\n1. No row or column may have two identical uncrossed numbers.\n\n2. Crossed cells cannot touch each other — not horizontally, not vertically.\n\n3. All uncrossed cells must be connected — one unbroken region.\n\nHow to play: tap to cross out, tap again to clear. Red = duplicate in row/column. Orange = cell is disconnected from the rest. Cyan = hint cell.',
   ],
 };
 
@@ -953,7 +953,7 @@ function ChapterInfoModal({ onClose, lang, paletteAccent, chapterIdx }) {
         <div style={{ fontFamily:'Cinzel, serif', fontWeight:500, fontSize:13, letterSpacing:4, color:'#E5C158', textTransform:'uppercase', marginBottom:14 }}>
           {t('hintTitle')}
         </div>
-        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:15, color:'rgba(255,243,184,0.88)', lineHeight:1.55, textAlign:'left', marginBottom:24 }}>
+        <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:14, color:'rgba(255,243,184,0.88)', lineHeight:1.6, textAlign:'left', marginBottom:24, whiteSpace:'pre-line' }}>
           {rules}
         </div>
         <button onClick={onClose} className="btn-reset" style={{

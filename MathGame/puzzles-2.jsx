@@ -1140,7 +1140,7 @@ function htGenLevel(levelIdx, difficulty) {
   return { grid, solution, size };
 }
 
-function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru' }) {
+function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru', onHint }) {
   const { grid: GRID, solution: SOLUTION, size } = _uM_q(() => {
     try { return htGenLevel(levelIdx, difficulty); }
     catch(e) { try { return htGenLevel(1, difficulty); } catch(e2) { return htGenLevel(1, 'normal'); } }
@@ -1155,6 +1155,101 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const dragModeRef = _uR_q(null); // { fill: true|null }
   const solvedRef = _uR_q(false);
   const winTimerRef = _uR_q(null);
+
+  // Конкретные подсказки — 3 в день, персистентны по дате
+  const todayKey = () => `hitori_hints_${new Date().toISOString().slice(0,10)}`;
+  const hintsUsed = () => { try { return parseInt(localStorage.getItem(todayKey()) || '0'); } catch(e) { return 0; } };
+  const HINTS_PER_DAY = 3;
+
+  // Вычисляем конкретную подсказку: находим ячейку где игрок точно должен зачеркнуть
+  const computeConcreteHint = (curCells) => {
+    // Ищем незачёркнутый дубликат в строке/столбце — предлагаем зачеркнуть один из них
+    for (let r = 0; r < size; r++) {
+      const seen = new Map();
+      for (let c = 0; c < size; c++) {
+        if (curCells[r * size + c] === true) continue;
+        const v = GRID[r][c];
+        if (!seen.has(v)) { seen.set(v, { r, c }); continue; }
+        // Нашли дубликат — предлагаем зачеркнуть тот, что соответствует SOLUTION
+        const prev = seen.get(v);
+        const crossThis = SOLUTION[r][c] ? { r, c } : prev;
+        return {
+          r: crossThis.r, c: crossThis.c, val: v,
+          reason: lang === 'en'
+            ? `Cross out ${v} at row ${crossThis.r+1}, col ${crossThis.c+1} — it duplicates ${v} in row ${crossThis.r+1}`
+            : `Зачеркни ${v} в строке ${crossThis.r+1}, столбце ${crossThis.c+1} — это число дублируется в строке ${crossThis.r+1}`,
+        };
+      }
+    }
+    for (let c = 0; c < size; c++) {
+      const seen = new Map();
+      for (let r = 0; r < size; r++) {
+        if (curCells[r * size + c] === true) continue;
+        const v = GRID[r][c];
+        if (!seen.has(v)) { seen.set(v, { r, c }); continue; }
+        const prev = seen.get(v);
+        const crossThis = SOLUTION[r][c] ? { r, c } : prev;
+        return {
+          r: crossThis.r, c: crossThis.c, val: v,
+          reason: lang === 'en'
+            ? `Cross out ${v} at row ${crossThis.r+1}, col ${crossThis.c+1} — it duplicates ${v} in column ${c+1}`
+            : `Зачеркни ${v} в строке ${crossThis.r+1}, столбце ${crossThis.c+1} — это число дублируется в столбце ${c+1}`,
+        };
+      }
+    }
+    // Смежные зачёркнутые
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (curCells[r * size + c] !== true) continue;
+        if (c < size - 1 && curCells[r * size + c + 1] === true) {
+          return {
+            r, c, val: GRID[r][c],
+            reason: lang === 'en'
+              ? `Uncheck ${GRID[r][c]} at row ${r+1}, col ${c+1} — two crossed cells touch each other`
+              : `Убери зачёркивание у ${GRID[r][c]} в строке ${r+1}, столбце ${c+1} — два зачёркнутых стоят рядом`,
+          };
+        }
+        if (r < size - 1 && curCells[(r+1) * size + c] === true) {
+          return {
+            r, c, val: GRID[r][c],
+            reason: lang === 'en'
+              ? `Uncheck ${GRID[r][c]} at row ${r+1}, col ${c+1} — two crossed cells touch each other`
+              : `Убери зачёркивание у ${GRID[r][c]} в строке ${r+1}, столбце ${c+1} — два зачёркнутых стоят рядом`,
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const [hintCell, setHintCell] = _uS_q(null); // { r, c } — подсвеченная подсказкой клетка
+  const [hintReason, setHintReason] = _uS_q('');
+  const [hintsLeft, setHintsLeft] = _uS_q(HINTS_PER_DAY - hintsUsed());
+
+  const handleConcreteHint = () => {
+    const used = hintsUsed();
+    if (used >= HINTS_PER_DAY) {
+      onHint && onHint({ exhausted: true });
+      return;
+    }
+    const h = computeConcreteHint(cellsRef.current);
+    if (!h) {
+      onHint && onHint({ noHint: true });
+      return;
+    }
+    try { localStorage.setItem(todayKey(), String(used + 1)); } catch(e) {}
+    setHintsLeft(HINTS_PER_DAY - used - 1);
+    setHintCell({ r: h.r, c: h.c });
+    setHintReason(h.reason);
+    onHint && onHint({ r: h.r, c: h.c, reason: h.reason, left: HINTS_PER_DAY - used - 1 });
+  };
+
+  // Сброс подсказки при смене уровня
+  _uE_q(() => {
+    setHintCell(null);
+    setHintReason('');
+    setHintsLeft(HINTS_PER_DAY - hintsUsed());
+  }, [levelIdx, difficulty]);
 
   // Сброс при смене уровня или сложности
   _uE_q(() => {
@@ -1173,10 +1268,11 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
   const H = PAD_TOP + gridH + 60; // viewBox height = SVG height used in svgPt
   const cellIdx = (r, c) => r * size + c;
 
-  // Ошибки для подсветки
-  const { errors, hint } = _uM_q(() => {
+  // Ошибки для подсветки: errors — дубликаты/смежные (красный), isolated — несвязные (оранжевый)
+  const { errors, isolated, hint } = _uM_q(() => {
     const errs = new Set();
-    if (cells.length !== size * size) return { errors: errs, hint: '' };
+    const iso = new Set();
+    if (cells.length !== size * size) return { errors: errs, isolated: iso, hint: '' };
     let hintMsg = '';
     // Проверка строк: незачёркнутые числа не должны повторяться
     for (let r = 0; r < size; r++) {
@@ -1214,7 +1310,7 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         }
       }
     }
-    // Проверка связности незачёркнутых (flood fill)
+    // Проверка связности незачёркнутых (flood fill) — ОТДЕЛЬНЫЙ цвет
     const visible = [];
     for (let i = 0; i < size * size; i++) { if (cells[i] !== true) visible.push(i); }
     if (visible.length > 0) {
@@ -1232,15 +1328,16 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         }
       }
       if (visited.size !== visible.length) {
-        // Изолированные ячейки подсвечиваем
-        visible.forEach(i => { if (!visited.has(i)) errs.add(i); });
-        hintMsg = lang === 'en' ? '· isolated cells — all white must be connected ·' : '· есть оторванные клетки — все незачёркнутые должны быть связаны ·';
+        visible.forEach(i => { if (!visited.has(i)) iso.add(i); });
+        hintMsg = lang === 'en'
+          ? '· isolated cells (orange) — all white cells must connect ·'
+          : '· оранжевые клетки оторваны — все незачёркнутые должны быть связаны ·';
       }
     }
     if (errs.size > 0 && !hintMsg) {
-      hintMsg = lang === 'en' ? '· duplicate numbers in a row or column ·' : '· повторяющиеся числа в строке или столбце ·';
+      hintMsg = lang === 'en' ? '· duplicate numbers in a row or column (red) ·' : '· красные — повторяющиеся числа в строке или столбце ·';
     }
-    return { errors: errs, hint: hintMsg };
+    return { errors: errs, isolated: iso, hint: hintMsg };
   }, [cells]);
 
   // Победа — проверяем правила Хитори, а не конкретное решение
@@ -1374,17 +1471,27 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
             const idx = cellIdx(r, c);
             const val = cells[idx];
             const isErr = errors.has(idx);
+            const isIso = isolated.has(idx);  // оранжевый — нарушение связности
+            const isHint = hintCell && hintCell.r === r && hintCell.c === c; // голубой — подсказка
             const isCrossed = val === true;
-            const isCircled = false; // кружок убран — только зачеркнуть или пусто
             const x = PAD_LEFT + c * CELL, y = PAD_TOP + r * CELL;
             const cx = x + CELL / 2, cy = y + CELL / 2;
+            // Цвет рамки: подсказка > изолировано > ошибка > обычный
+            const strokeColor = isHint ? '#4DEEEA'
+              : isIso ? '#FF9500'
+              : isErr ? '#FF6B6B'
+              : isCrossed ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.4)';
+            const glowFilter = isHint ? 'drop-shadow(0 0 6px #4DEEEA)'
+              : isIso ? 'drop-shadow(0 0 4px #FF9500)'
+              : isErr ? 'drop-shadow(0 0 4px #FF6B6B)' : 'none';
             return (
               <g key={idx}>
                 <rect x={x + 0.5} y={y + 0.5} width={CELL - 1} height={CELL - 1}
-                  fill={isCrossed ? (solved ? 'rgba(229,193,88,0.1)' : 'rgba(11,16,29,0.9)') : 'rgba(11,16,29,0.6)'}
-                  stroke={isErr ? '#FF6B6B' : (isCrossed ? 'rgba(212,175,55,0.2)' : 'rgba(212,175,55,0.4)')}
-                  strokeWidth="0.6"
-                  style={{ filter: isErr ? 'drop-shadow(0 0 4px #FF6B6B)' : 'none' }}
+                  fill={isHint ? 'rgba(77,238,234,0.12)'
+                    : isIso ? 'rgba(255,149,0,0.12)'
+                    : isCrossed ? (solved ? 'rgba(229,193,88,0.1)' : 'rgba(11,16,29,0.9)') : 'rgba(11,16,29,0.6)'}
+                  stroke={strokeColor} strokeWidth={isHint || isIso ? 1.2 : 0.6}
+                  style={{ filter: glowFilter }}
                 />
                 {isCrossed && !solved && (
                   <g stroke={isErr ? '#FF6B6B' : 'rgba(212,175,55,0.6)'} strokeWidth="1.5">
@@ -1392,17 +1499,14 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
                     <line x1={x+CELL-5} y1={y+5} x2={x+5} y2={y+CELL-5} />
                   </g>
                 )}
-                {isCircled && (
-                  <circle cx={cx} cy={cy} r={CELL/2 - 5}
-                    fill="none" stroke={isErr ? '#FF6B6B' : paletteAccent} strokeWidth="1.2"
-                    style={{ filter: `drop-shadow(0 0 3px ${paletteAccent})` }} />
-                )}
                 {/* Число */}
                 <text x={cx} y={cy + 5} textAnchor="middle"
                   fontFamily="Cinzel, serif" fontWeight="500"
                   fontSize={CELL > 40 ? "16" : "13"}
                   fill={isCrossed
                     ? (solved ? '#E5C158' : 'rgba(212,175,55,0.3)')
+                    : isHint ? '#4DEEEA'
+                    : isIso ? '#FF9500'
                     : (isErr ? '#FF6B6B' : (solved ? '#E5C158' : '#fff3b8'))}
                   style={{ filter: solved && !isCrossed ? 'drop-shadow(0 0 3px #E5C158)' : 'none' }}>
                   {GRID[r][c]}
@@ -1416,16 +1520,39 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         <rect x={PAD_LEFT} y={PAD_TOP} width={size*CELL} height={size*CELL}
           fill="none" stroke="rgba(212,175,55,0.5)" strokeWidth="0.8" />
 
-        {/* Подсказка */}
-        <text x={W/2} y={PAD_TOP + size*CELL + 22} textAnchor="middle"
-          fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="13"
-          fill={hint ? '#FF6B6B' : 'rgba(212,175,55,0.85)'}>
+        {/* Статус / подсказка об ошибке */}
+        <text x={W/2} y={PAD_TOP + size*CELL + 20} textAnchor="middle"
+          fontFamily="Cormorant Garamond, serif" fontStyle="italic" fontSize="12"
+          fill={hint ? (isolated.size > 0 ? '#FF9500' : '#FF6B6B') : 'rgba(212,175,55,0.7)'}>
           {solved
             ? '· Hitori solutum ·'
-            : hint
-              ? hint
-              : lang === 'en' ? '· Tap to cross out · tap again to clear ·' : '· Тап — зачеркнуть · ещё раз — убрать ·'}
+            : hint || (lang === 'en' ? '· Tap to cross out · tap again to clear ·' : '· Тап — зачеркнуть · ещё раз — убрать ·')}
         </text>
+
+        {/* Текст конкретной подсказки */}
+        {hintReason !== '' && !solved && (
+          <foreignObject x={PAD_LEFT} y={PAD_TOP + size*CELL + 30} width={gridW} height={50}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+              fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
+              fontSize:'11px', color:'#4DEEEA', textAlign:'center', lineHeight:1.35,
+            }}>{hintReason}</div>
+          </foreignObject>
+        )}
+
+        {/* Кнопка конкретной подсказки */}
+        {!solved && (
+          <g onClick={handleConcreteHint} style={{ cursor:'pointer' }}>
+            <rect x={W/2 - 70} y={PAD_TOP + size*CELL + 82} width={140} height={26} rx={13}
+              fill="rgba(77,238,234,0.08)" stroke="rgba(77,238,234,0.35)" strokeWidth="0.8" />
+            <text x={W/2} y={PAD_TOP + size*CELL + 99} textAnchor="middle"
+              fontFamily="Cinzel, serif" fontSize="9" letterSpacing="2"
+              fill={hintsLeft > 0 ? 'rgba(77,238,234,0.85)' : 'rgba(77,238,234,0.3)'}>
+              {lang === 'en'
+                ? `HINT · ${hintsLeft} LEFT TODAY`
+                : `ПОДСКАЗКА · ОСТАЛОСЬ ${hintsLeft}`}
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );
