@@ -1580,14 +1580,17 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
         {/* Кнопка конкретной подсказки */}
         {!solved && (
           <g onClick={handleConcreteHint} style={{ cursor:'pointer' }}>
-            <rect x={W/2 - 70} y={PAD_TOP + size*CELL + 82} width={140} height={26} rx={13}
+            <rect x={W/2 - 80} y={PAD_TOP + size*CELL + 78} width={160} height={34} rx={17}
               fill="rgba(77,238,234,0.08)" stroke="rgba(77,238,234,0.35)" strokeWidth="0.8" />
-            <text x={W/2} y={PAD_TOP + size*CELL + 99} textAnchor="middle"
+            <text x={W/2} y={PAD_TOP + size*CELL + 91} textAnchor="middle"
               fontFamily="Cinzel, serif" fontSize="9" letterSpacing="2"
               fill={hintsLeft > 0 ? 'rgba(77,238,234,0.85)' : 'rgba(77,238,234,0.3)'}>
-              {lang === 'en'
-                ? `HINT · ${hintsLeft} LEFT TODAY`
-                : `ПОДСКАЗКА · ОСТАЛОСЬ ${hintsLeft}`}
+              {lang === 'en' ? 'HINT' : 'ПОДСКАЗКА'}
+            </text>
+            <text x={W/2} y={PAD_TOP + size*CELL + 104} textAnchor="middle"
+              fontFamily="Comfortaa, sans-serif" fontSize="8" letterSpacing="1"
+              fill={hintsLeft > 0 ? 'rgba(77,238,234,0.55)' : 'rgba(77,238,234,0.25)'}>
+              {lang === 'en' ? `${hintsLeft} of 3 left today` : `осталось ${hintsLeft} из 3`}
             </text>
           </g>
         )}
