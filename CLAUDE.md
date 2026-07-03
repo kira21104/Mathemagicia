@@ -7,6 +7,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Mathemagicia — a mystical, alchemy-themed math puzzle game for any kind, built as React 18
 running directly in the browser (no bundler) and packaged for Android via Capacitor.
 
+## Session workflow (READ FIRST, every session)
+
+1. **Start from GitHub issues.** At the beginning of each session, check the repo issues
+   (`gh` / GitHub) and pick **one** issue to work on. Work **strictly within the scope of that
+   single issue** — do not drift into unrelated changes; anything out of scope becomes a new
+   issue.
+2. **One branch per task.** Create a new git branch for the issue (e.g. `issue-<N>` or
+   `issue-<N>-short-slug`) off the default branch, do all work there, and open a PR back —
+   never commit task work directly to `master`.
+3. **Create a per-issue work folder** `work/issue-<N>/` (N = issue number) with three files:
+   - `TASK.md` — what the issue is about (goal, context, acceptance criteria, copied/linked
+     from the GitHub issue).
+   - `PLAN.md` — the planning/decomposition stage: the concrete change plan, files to touch,
+     and steps. It **must contain a status field**, e.g. a frontmatter or header line
+     `status: planning` → `status: done`. **Do not start implementing until planning is
+     finished and `status = done`.**
+   - `NOTE.md` — a running log of what was actually done (decisions, deviations, results,
+     follow-ups).
+3. **Two hard requirements on every task:**
+   - **Versioning** — respect the version scheme (`MAJOR.MINOR.PATCH`, see issue #1 /
+     `epic::app_updating`): any user-facing change bumps the version via the single source of
+     truth (`npm run bump`), and the Android `versionCode` stays monotonic.
+   - **Backward compatibility** — never break existing installs: preserve `localStorage` keys
+     (`mg_*`, `mathgame_lang`) and save/progress shapes, keep API request/response contracts
+     additive, and keep the `MathGame/` ↔ `www/` trees in sync. Migrate, don't break.
+
 ## Commands
 
 - **Install deps:** `npm install`
