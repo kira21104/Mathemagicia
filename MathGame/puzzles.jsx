@@ -90,6 +90,7 @@ function GraphPuzzle({ onWin, onSumChange, onHint, paletteAccent = '#4DEEEA', le
     if (solved) return;
     // Если цепочка не пуста — можно тянуть только с последнего узла
     if (chain.length > 0 && node.id !== chain[chain.length - 1]) return;
+    SFX && SFX.dragStart(); VIB && VIB.dragStart();
     setDragFrom(node);
     setPointer({ x: node.x, y: node.y });
     setTrail([{ x: node.x, y: node.y, id: Date.now() }]);
@@ -167,6 +168,8 @@ function GraphPuzzle({ onWin, onSumChange, onHint, paletteAccent = '#4DEEEA', le
           }
         }
       }
+    } else {
+      SFX && SFX.dragEnd(); VIB && VIB.dragEnd();
     }
 
     setDragFrom(null);

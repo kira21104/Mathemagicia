@@ -13,7 +13,11 @@ function CoverScreen({ onOpen, onSettings, lang, setLang, paletteAccent }) {
     localStorage.setItem('mg_sound', next ? 'on' : 'off');
     localStorage.setItem('mg_music', next ? 'on' : 'off');
     SFX && SFX.setEnabled(next);
+    MUSIC && MUSIC.setEnabled(next);
   };
+
+  // Фоновая музыка меню — играет на обложке
+  _uE_s(() => { MUSIC && MUSIC.play('audio/sound.wav'); }, []);
 
   return (
     <div className="screen night-bg starfield" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'space-between', padding:'70px 28px 50px' }}>
@@ -150,6 +154,9 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
   const [skyOpen, setSkyOpen] = _uS_s(false);
   const chapters = STRINGS[lang].chapters;
   const chapterSubs = STRINGS[lang].chapterSub;
+
+  // Фоновая музыка меню — играет на экране выбора глав
+  _uE_s(() => { MUSIC && MUSIC.play('audio/sound.wav'); }, []);
 
   // Гравюры (левая страница) — по одной на главу
   const constellations = [
@@ -705,6 +712,13 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
   const LEVELS_PER_PAGE = 6;
   const chapterRomanNums = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
+  _uE_s(() => {
+    const hasAny = (chapterLevels || []).some(n => (n || 0) > 0);
+    if (hasAny) { SFX && SFX.starCollect(); VIB && VIB.starCollect(); }
+    // Фоновая музыка меню — играет и в звёздной коллекции
+    MUSIC && MUSIC.play('audio/sound.wav');
+  }, []);
+
   // Группируем по главам: только главы с хотя бы одним пройденным уровнем
   const allGroups = _uM_s(() => chapters.map((chapterName, ci) => {
     const done = chapterLevels[ci] || 0;
@@ -930,6 +944,7 @@ const DIFFICULTY_LABELS = {
 function ChapterInfoModal({ onClose, lang, paletteAccent, chapterIdx }) {
   const rules = (CHAPTER_RULES[lang] || CHAPTER_RULES.ru)[chapterIdx];
   const t = useT(lang);
+  _uE_s(() => { SFX && SFX.hint(); VIB && VIB.hint(); }, []);
 
   return (
     <div style={{ position:'absolute', inset:0, zIndex:40,
@@ -971,6 +986,7 @@ function ChapterInfoModal({ onClose, lang, paletteAccent, chapterIdx }) {
 
 function HintModal({ onClose, lang, paletteAccent, hintText }) {
   const t = useT(lang);
+  _uE_s(() => { SFX && SFX.hint(); VIB && VIB.hint(); }, []);
   return (
     <div style={{ position:'absolute', inset:0, zIndex:40,
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
@@ -1014,14 +1030,15 @@ function HintModal({ onClose, lang, paletteAccent, hintText }) {
 }
 
 // ─────────────────────────── SETTINGS
-function SettingsScreen({ onBack, lang, setLang, paletteAccent, setPaletteAccent, theme, setTheme }) {
+function SettingsScreen({ onBack, lang, setLang, paletteAccent, setPaletteAccent, theme, setTheme, onResetProgress }) {
   const t = useT(lang);
   const [sound, setSound] = _uS_s(() => localStorage.getItem('mg_sound') !== 'off');
   const [music, setMusic] = _uS_s(() => localStorage.getItem('mg_music') !== 'off');
   const [haptics, setHaptics] = _uS_s(() => localStorage.getItem('mg_haptics') !== 'off');
+  const [resetStep, setResetStep] = _uS_s(0); // 0=idle, 1=confirm, 2=done
 
   _uE_s(() => { localStorage.setItem('mg_sound', sound ? 'on' : 'off'); SFX && SFX.setEnabled(sound); }, [sound]);
-  _uE_s(() => { localStorage.setItem('mg_music', music ? 'on' : 'off'); }, [music]);
+  _uE_s(() => { localStorage.setItem('mg_music', music ? 'on' : 'off'); MUSIC && MUSIC.setEnabled(music); }, [music]);
   _uE_s(() => { localStorage.setItem('mg_haptics', haptics ? 'on' : 'off'); VIB && VIB.setEnabled(haptics); }, [haptics]);
 
   const Row = ({ label, right, last }) => (
@@ -1113,6 +1130,50 @@ function SettingsScreen({ onBack, lang, setLang, paletteAccent, setPaletteAccent
             </div>
           </div>
         </div>
+
+        {onResetProgress && (
+          <div style={{ marginTop: 22 }}>
+            <div className="gold-frame" style={{ padding:'14px 20px', borderRadius:10, background:'rgba(11,16,29,0.5)' }}>
+              {resetStep === 0 && (
+                <button className="btn-reset" onClick={() => setResetStep(1)} style={{
+                  width:'100%', padding:'10px 0', borderRadius:8,
+                  border:'1px solid rgba(255,107,107,0.4)',
+                  background:'rgba(255,107,107,0.08)',
+                  fontFamily:'Comfortaa, sans-serif', fontSize:12, letterSpacing:2,
+                  textTransform:'uppercase', color:'rgba(255,150,150,0.85)',
+                }}>{t('resetProgress')}</button>
+              )}
+              {resetStep === 1 && (
+                <div>
+                  <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:14, color:'#f1e2b8', textAlign:'center', marginBottom:12, lineHeight:1.4 }}>
+                    {t('resetConfirm')}
+                  </div>
+                  <div style={{ display:'flex', gap:10 }}>
+                    <button className="btn-reset" onClick={() => setResetStep(0)} style={{
+                      flex:1, padding:'9px 0', borderRadius:8,
+                      border:'1px solid rgba(212,175,55,0.35)',
+                      background:'rgba(212,175,55,0.06)',
+                      fontFamily:'Comfortaa, sans-serif', fontSize:11, letterSpacing:2,
+                      textTransform:'uppercase', color:'rgba(229,193,88,0.7)',
+                    }}>{lang === 'ru' ? 'Отмена' : 'Cancel'}</button>
+                    <button className="btn-reset" onClick={() => { onResetProgress(); setResetStep(2); setTimeout(() => setResetStep(0), 2200); }} style={{
+                      flex:1, padding:'9px 0', borderRadius:8,
+                      border:'1px solid rgba(255,107,107,0.6)',
+                      background:'rgba(255,107,107,0.15)',
+                      fontFamily:'Comfortaa, sans-serif', fontSize:11, letterSpacing:2,
+                      textTransform:'uppercase', color:'rgba(255,150,150,0.9)',
+                    }}>{lang === 'ru' ? 'Сбросить' : 'Reset'}</button>
+                  </div>
+                </div>
+              )}
+              {resetStep === 2 && (
+                <div style={{ textAlign:'center', fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:15, color:'rgba(77,238,234,0.9)', letterSpacing:0.5 }}>
+                  ✓ {t('resetDone')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop: 28, textAlign:'center', fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', color:'rgba(212,175,55,0.5)', fontSize:13, letterSpacing:1 }}>
           «Mathemagicia · MMXXVI»<br/>

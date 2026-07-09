@@ -33,6 +33,13 @@ function GameShell({ chapterIdx, levelIdx, onBack, onWin, onChapters, lang, pale
   const [solved, setSolved] = _uS_p(false);
   const [sumInfo, setSumInfo] = _uS_p(null); // { sum, target } for chapter I
 
+  // В игре — тишина. Останавливаем фоновую музыку меню.
+  // При выходе (размонтировании GameShell) — снова запускаем музыку.
+  _uE_p(() => {
+    MUSIC && MUSIC.stop();
+    return () => { MUSIC && MUSIC.play('audio/sound.wav'); };
+  }, []);
+
   // Per-chapter puzzle & task copy
   const tasks = {
     ru: [
@@ -202,6 +209,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
 
   // Переход между экранами: мгновенно накрываем, меняем экран, плавно открываем
   const goTo = (nextScreen, extraFn) => {
+    SFX && SFX.transition(); VIB && VIB.transition();
     setCoverBlack(true);
     setTimeout(() => {
       extraFn && extraFn();
@@ -222,6 +230,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
 
   // Победа → следующий уровень: накрываем экран, меняем уровень (новый key → новый GameShell), снимаем накрытие
   const handleWinContinue = (ci) => {
+    SFX && SFX.transition(); VIB && VIB.transition();
     setCoverBlack(true);
     // Дать React один кадр чтобы применить coverBlack, затем менять уровень
     setTimeout(() => {
@@ -259,7 +268,11 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
     body = <SettingsScreen onBack={() => setScreen('cover')}
       lang={lang} setLang={setLangPersist}
       paletteAccent={paletteAccent} setPaletteAccent={setPaletteAccent}
-      theme={theme} setTheme={setTheme} />;
+      theme={theme} setTheme={setTheme}
+      onResetProgress={() => {
+        try { localStorage.removeItem('mathgame_levels'); } catch(e) {}
+        setChapterLevels([0, 0, 0, 0, 0, 0]);
+      }} />;
   }
 
   return (

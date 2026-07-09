@@ -3,7 +3,9 @@
   "appName": "Mathemagicia",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#060912"
+    "backgroundColor": "#060912",
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {

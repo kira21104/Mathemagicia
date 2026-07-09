@@ -166,7 +166,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
   const onPointerDown = (piece) => (e) => {
     if (solved) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    SFX && SFX.tap(); VIB && VIB.tap();
+    SFX && SFX.dragStart(); VIB && VIB.dragStart();
     const p = svgPt(e.clientX, e.clientY);
     dragRef.current = { id: piece.id, dx: p.x-piece.x, dy: p.y-piece.y };
     setDragId(piece.id);
@@ -209,6 +209,7 @@ function MagicSquarePuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, dif
         }
         return ps.map(pc=>pc.id===id?{...pc,x:ctr.x,y:ctr.y,placed:tgt}:pc);
       }
+      SFX && SFX.dragEnd(); VIB && VIB.dragEnd();
       return ps.map(pc=>pc.id===id?{...pc,x:pc.home.x,y:pc.home.y,placed:null}:pc);
     });
   };
@@ -469,7 +470,7 @@ function NonogramPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diffic
       if (ok && !prev.cols[c]) fired = true;
       prev.cols[c] = ok;
     }
-    if (fired && !solved) SFX && SFX.lineOk(); VIB && VIB.lineOk();
+    if (fired && !solved) { SFX && SFX.lineOk(); VIB && VIB.lineOk(); }
   }, [cells]);
 
   return (
@@ -609,6 +610,7 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) 
       setTimeout(() => setError(null), 600);
       return;
     }
+    SFX && SFX.dragStart(); VIB && VIB.dragStart();
     setDragFrom(star);
     setPointer({ x: star.x, y: star.y });
     setTrail([{ x: star.x, y: star.y, id: Date.now() }]);
@@ -647,6 +649,8 @@ function ConstellationPuzzle({ onWin, paletteAccent = '#4DEEEA', lang = 'ru' }) 
         SFX && SFX.error(); VIB && VIB.error();
         setTimeout(() => setError(null), 700);
       }
+    } else {
+      SFX && SFX.dragEnd(); VIB && VIB.dragEnd();
     }
     setDragFrom(null);
     setPointer(null);
@@ -920,7 +924,7 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
   const onPointerDown = (piece) => (e) => {
     if (solved) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    SFX && SFX.tap(); VIB && VIB.tap();
+    SFX && SFX.dragStart(); VIB && VIB.dragStart();
     const p = svgPt(e.clientX, e.clientY);
     dragRef.current = { id: piece.id, dx: p.x - piece.x, dy: p.y - piece.y };
     setDragId(piece.id);
@@ -958,7 +962,7 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
           : pc);
       }
       // Вернуть домой — не попал в узел
-      SFX && SFX.error(); VIB && VIB.error();
+      SFX && SFX.dragEnd(); VIB && VIB.dragEnd();
       return ps.map(pc => pc.id === id ? { ...pc, x: pc.home.x, y: pc.home.y, placedNode: null } : pc);
     });
   };
@@ -1083,64 +1087,341 @@ function MagicStarsPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, diff
 // and crossed cells don't touch each other.
 // ─────────────────────────────────────────────────────────────
 
+// xorshift32 — детерминированный генератор
 function htXr(seed) {
-  let s = seed | 1;
-  return () => { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return (s >>> 0) / 0xFFFFFFFF; };
+  var s = ((seed | 1) >>> 0) || 1;
+  return function() {
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    s = s >>> 0;
+    return s / 0x100000000;
+  };
 }
 
-function htGenLevel(levelIdx, difficulty) {
-  const size = difficulty === 'easy' ? 4 : difficulty === 'hard' ? 6 : 5;
-  const rng = htXr(levelIdx * 4567 + 31);
-
-  // Шаг 1: строим латинский квадрат size×size (числа 1..size, уникальны в строке и столбце)
-  // Метод: строка r = циклический сдвиг базовой перестановки, затем перемешиваем столбцы
-  const base = Array.from({ length: size }, (_, i) => i + 1);
-  const latin = Array.from({ length: size }, (_, r) =>
-    base.map((_, c) => ((r + c) % size) + 1)
-  );
-  // Перемешиваем столбцы
-  const colPerm = Array.from({ length: size }, (_, i) => i);
-  for (let i = colPerm.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1)); [colPerm[i], colPerm[j]] = [colPerm[j], colPerm[i]];
+// Fisher-Yates shuffle, возвращает новый массив
+function htShuffle(arr, rng) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
   }
-  // Перемешиваем строки
-  const rowPerm = Array.from({ length: size }, (_, i) => i);
-  for (let i = rowPerm.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1)); [rowPerm[i], rowPerm[j]] = [rowPerm[j], rowPerm[i]];
-  }
-  const shuffled = rowPerm.map(r => colPerm.map(c => latin[r][c]));
+  return a;
+}
 
-  // Шаг 2: выбираем ячейки для зачёркивания — не смежные друг с другом
-  const solution = Array.from({ length: size }, () => Array(size).fill(false));
-  const crossTarget = difficulty === 'easy' ? size - 1 : difficulty === 'hard' ? size + 1 : size;
-  let crossed = 0, attempts = 0;
-  while (crossed < crossTarget && attempts < 300) {
-    attempts++;
-    const r = Math.floor(rng() * size);
-    const c = Math.floor(rng() * size);
-    if (solution[r][c]) continue;
-    const adj = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
-    if (adj.some(([nr,nc]) => nr >= 0 && nr < size && nc >= 0 && nc < size && solution[nr][nc])) continue;
-    solution[r][c] = true;
-    crossed++;
+// BFS-связность белых клеток. black — плоский Uint8Array size*size, 1=чёрная
+function htConnected(black, size) {
+  var total = 0, startIdx = -1;
+  for (var i = 0; i < size * size; i++) {
+    if (!black[i]) { total++; if (startIdx < 0) startIdx = i; }
+  }
+  if (total === 0) return true;
+  var visited = new Uint8Array(size * size);
+  var q = [startIdx]; visited[startIdx] = 1; var cnt = 1;
+  while (q.length) {
+    var cur = q.pop();
+    var r = Math.floor(cur / size), c = cur % size;
+    if (r > 0      && !black[cur - size] && !visited[cur - size]) { visited[cur - size] = 1; cnt++; q.push(cur - size); }
+    if (r < size-1 && !black[cur + size] && !visited[cur + size]) { visited[cur + size] = 1; cnt++; q.push(cur + size); }
+    if (c > 0      && !black[cur - 1]    && !visited[cur - 1])    { visited[cur - 1] = 1;    cnt++; q.push(cur - 1); }
+    if (c < size-1 && !black[cur + 1]    && !visited[cur + 1])    { visited[cur + 1] = 1;    cnt++; q.push(cur + 1); }
+  }
+  return cnt === total;
+}
+
+// Нет ли соседней чёрной для клетки (r,c) в маске black (плоский Uint8Array)
+function htNoAdj(black, r, c, size) {
+  if (r > 0      && black[(r-1)*size+c]) return false;
+  if (r < size-1 && black[(r+1)*size+c]) return false;
+  if (c > 0      && black[r*size+c-1])   return false;
+  if (c < size-1 && black[r*size+c+1])   return false;
+  return true;
+}
+
+// ── Шаг 1: маска чёрных клеток ──────────────────────────────
+function htGenMask(size, targetBlack, rng) {
+  var n = size * size;
+  // Строим список кандидатов в случайном порядке
+  var order = [];
+  for (var i = 0; i < n; i++) order.push(i);
+  order = htShuffle(order, rng);
+
+  var black = new Uint8Array(n);
+  var cnt = 0;
+  for (var k = 0; k < order.length; k++) {
+    if (cnt >= targetBlack) break;
+    var idx = order[k];
+    var r = Math.floor(idx / size), c = idx % size;
+    if (!htNoAdj(black, r, c, size)) continue;
+    black[idx] = 1;
+    if (!htConnected(black, size)) { black[idx] = 0; continue; }
+    cnt++;
+  }
+  return cnt === targetBlack ? black : null;
+}
+
+// ── Шаг 2: заполнение числами ────────────────────────────────
+// Белым — числа 1..size без повторов в строке/столбце (backtracking).
+// Чёрным — дубликат из строки или столбца.
+function htFillGrid(black, size, rng) {
+  var grid = new Array(size * size).fill(0);
+  var usedRow = [], usedCol = [];
+  for (var i = 0; i < size; i++) { usedRow.push(new Uint8Array(size + 1)); usedCol.push(new Uint8Array(size + 1)); }
+
+  var allWhite = [];
+  for (var r = 0; r < size; r++)
+    for (var c = 0; c < size; c++)
+      if (!black[r * size + c]) allWhite.push(r * size + c);
+
+  function fill(pos) {
+    if (pos === allWhite.length) return true;
+    var idx = allWhite[pos];
+    var rr = Math.floor(idx / size), cc = idx % size;
+    var nums = htShuffle([1,2,3,4,5,6].slice(0, size), rng);
+    for (var i = 0; i < nums.length; i++) {
+      var v = nums[i];
+      if (usedRow[rr][v] || usedCol[cc][v]) continue;
+      grid[idx] = v; usedRow[rr][v] = 1; usedCol[cc][v] = 1;
+      if (fill(pos + 1)) return true;
+      grid[idx] = 0; usedRow[rr][v] = 0; usedCol[cc][v] = 0;
+    }
+    return false;
   }
 
-  // Шаг 3: строим grid — копируем латинский квадрат, затем зачёркнутым ячейкам
-  // ставим дубликат значения из той же строки (гарантирует наличие дубликата)
-  const grid = shuffled.map(row => row.slice());
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (!solution[r][c]) continue;
-      // Берём значение незачёркнутой ячейки той же строки (всегда есть — не вся строка зачёркнута)
-      const visibleInRow = [];
-      for (let cc = 0; cc < size; cc++) { if (!solution[r][cc]) visibleInRow.push(grid[r][cc]); }
-      // Предпочитаем значение из того же столбца (дубликат в столбце тоже)
-      const sameCol = grid[r][c]; // исходное значение из латинского квадрата
-      grid[r][c] = visibleInRow.length > 0 ? visibleInRow[Math.floor(rng() * visibleInRow.length)] : sameCol;
+  if (!fill(0)) return null;
+
+  // Чёрным — дубликат из строки/столбца
+  for (var r = 0; r < size; r++) {
+    for (var c = 0; c < size; c++) {
+      var idx = r * size + c;
+      if (!black[idx]) continue;
+      var fromRow = [], fromCol = [];
+      for (var cc = 0; cc < size; cc++) if (!black[r*size+cc]) fromRow.push(grid[r*size+cc]);
+      for (var rr = 0; rr < size; rr++) if (!black[rr*size+c]) fromCol.push(grid[rr*size+c]);
+      var both = [];
+      for (var i = 0; i < fromRow.length; i++)
+        for (var j = 0; j < fromCol.length; j++)
+          if (fromRow[i] === fromCol[j]) both.push(fromRow[i]);
+      var pool = both.length ? both : fromRow.concat(fromCol);
+      if (!pool.length) return null;
+      grid[idx] = pool[Math.floor(rng() * pool.length)];
+    }
+  }
+  return grid;
+}
+
+// ── Шаг 3: чисто логический солвер (без рекурсии) ───────────
+// Применяет правила итеративно. Возвращает { ok, solution } где
+// ok=true если все клетки определены и правила выполнены.
+// state: плоский Int8Array, 0=unknown, 1=black, 2=white
+function htLogicSolve(grid, black, size) {
+  var n = size * size;
+  var st = new Int8Array(n);
+  // Заранее известные чёрные из маски
+  for (var i = 0; i < n; i++) if (black[i]) st[i] = 1; else st[i] = 0;
+  // Белые соседи чёрных
+  for (var r = 0; r < size; r++)
+    for (var c = 0; c < size; c++)
+      if (st[r*size+c] === 1) {
+        if (r>0)      st[(r-1)*size+c] = 2;
+        if (r<size-1) st[(r+1)*size+c] = 2;
+        if (c>0)      st[r*size+c-1]   = 2;
+        if (c<size-1) st[r*size+c+1]   = 2;
+      }
+
+  var changed = true, safety = 0;
+  while (changed && safety++ < 80) {
+    changed = false;
+
+    // Правило A: дубликаты в строке
+    for (var r = 0; r < size; r++) {
+      var groups = {};
+      for (var c = 0; c < size; c++) {
+        var v = grid[r*size+c];
+        if (!groups[v]) groups[v] = [];
+        groups[v].push(c);
+      }
+      var keys = Object.keys(groups);
+      for (var ki = 0; ki < keys.length; ki++) {
+        var cols = groups[keys[ki]];
+        if (cols.length < 2) continue;
+        var nBlack = 0, nUnk = 0, lastUnk = -1;
+        for (var i = 0; i < cols.length; i++) {
+          var s = st[r*size+cols[i]];
+          if (s === 1) nBlack++;
+          else if (s === 0) { nUnk++; lastUnk = cols[i]; }
+        }
+        if (nBlack >= 1) {
+          for (var i = 0; i < cols.length; i++)
+            if (st[r*size+cols[i]] === 0) { st[r*size+cols[i]] = 2; changed = true; }
+        }
+        if (nBlack === 0 && nUnk === 1) {
+          st[r*size+lastUnk] = 1; changed = true;
+          if (r>0           && st[(r-1)*size+lastUnk] === 0) { st[(r-1)*size+lastUnk] = 2; changed = true; }
+          if (r<size-1      && st[(r+1)*size+lastUnk] === 0) { st[(r+1)*size+lastUnk] = 2; changed = true; }
+          if (lastUnk>0      && st[r*size+lastUnk-1]  === 0) { st[r*size+lastUnk-1]   = 2; changed = true; }
+          if (lastUnk<size-1 && st[r*size+lastUnk+1]  === 0) { st[r*size+lastUnk+1]   = 2; changed = true; }
+        }
+      }
+    }
+
+    // Правило A: дубликаты в столбце
+    for (var c = 0; c < size; c++) {
+      var groups = {};
+      for (var r = 0; r < size; r++) {
+        var v = grid[r*size+c];
+        if (!groups[v]) groups[v] = [];
+        groups[v].push(r);
+      }
+      var keys = Object.keys(groups);
+      for (var ki = 0; ki < keys.length; ki++) {
+        var rows = groups[keys[ki]];
+        if (rows.length < 2) continue;
+        var nBlack = 0, nUnk = 0, lastUnk = -1;
+        for (var i = 0; i < rows.length; i++) {
+          var s = st[rows[i]*size+c];
+          if (s === 1) nBlack++;
+          else if (s === 0) { nUnk++; lastUnk = rows[i]; }
+        }
+        if (nBlack >= 1) {
+          for (var i = 0; i < rows.length; i++)
+            if (st[rows[i]*size+c] === 0) { st[rows[i]*size+c] = 2; changed = true; }
+        }
+        if (nBlack === 0 && nUnk === 1) {
+          st[lastUnk*size+c] = 1; changed = true;
+          if (lastUnk>0      && st[(lastUnk-1)*size+c] === 0) { st[(lastUnk-1)*size+c] = 2; changed = true; }
+          if (lastUnk<size-1 && st[(lastUnk+1)*size+c] === 0) { st[(lastUnk+1)*size+c] = 2; changed = true; }
+          if (c>0      && st[lastUnk*size+c-1] === 0) { st[lastUnk*size+c-1] = 2; changed = true; }
+          if (c<size-1 && st[lastUnk*size+c+1] === 0) { st[lastUnk*size+c+1] = 2; changed = true; }
+        }
+      }
+    }
+
+    // Правило B: клетка-unknown, у которой нет дубликата ни в строке ни в столбце
+    // (среди всех клеток, не только белых) — она точно белая
+    for (var r = 0; r < size; r++) {
+      for (var c = 0; c < size; c++) {
+        if (st[r*size+c] !== 0) continue;
+        var v = grid[r*size+c];
+        var dupRow = false, dupCol = false;
+        for (var cc = 0; cc < size; cc++) if (cc !== c && grid[r*size+cc] === v) { dupRow = true; break; }
+        for (var rr = 0; rr < size; rr++) if (rr !== r && grid[rr*size+c] === v) { dupCol = true; break; }
+        if (!dupRow && !dupCol) { st[r*size+c] = 2; changed = true; }
+      }
+    }
+
+    // Правило C: соседи чёрной => белые
+    for (var r = 0; r < size; r++) {
+      for (var c = 0; c < size; c++) {
+        if (st[r*size+c] !== 1) continue;
+        if (r>0      && st[(r-1)*size+c] === 0) { st[(r-1)*size+c] = 2; changed = true; }
+        if (r<size-1 && st[(r+1)*size+c] === 0) { st[(r+1)*size+c] = 2; changed = true; }
+        if (c>0      && st[r*size+c-1]   === 0) { st[r*size+c-1]   = 2; changed = true; }
+        if (c<size-1 && st[r*size+c+1]   === 0) { st[r*size+c+1]   = 2; changed = true; }
+      }
+    }
+
+    // Правило D: если пометить unknown-клетку чёрной — нарушается смежность чёрных => она белая
+    for (var r = 0; r < size; r++) {
+      for (var c = 0; c < size; c++) {
+        if (st[r*size+c] !== 0) continue;
+        var adjBlack = false;
+        if (r>0      && st[(r-1)*size+c] === 1) adjBlack = true;
+        if (r<size-1 && st[(r+1)*size+c] === 1) adjBlack = true;
+        if (c>0      && st[r*size+c-1]   === 1) adjBlack = true;
+        if (c<size-1 && st[r*size+c+1]   === 1) adjBlack = true;
+        if (adjBlack) { st[r*size+c] = 2; changed = true; }
+      }
     }
   }
 
-  return { grid, solution, size };
+  // Проверяем: все клетки определены и правила не нарушены
+  for (var i = 0; i < n; i++) if (st[i] === 0) return { ok: false, solution: null };
+  // Нет смежных чёрных
+  for (var r = 0; r < size; r++)
+    for (var c = 0; c < size; c++)
+      if (st[r*size+c] === 1) {
+        if (c<size-1 && st[r*size+c+1] === 1) return { ok: false, solution: null };
+        if (r<size-1 && st[(r+1)*size+c] === 1) return { ok: false, solution: null };
+      }
+  // Нет дубликатов среди белых
+  for (var r = 0; r < size; r++) {
+    var seen = new Uint8Array(size + 1);
+    for (var c = 0; c < size; c++) {
+      if (st[r*size+c] === 1) continue;
+      var v = grid[r*size+c];
+      if (seen[v]) return { ok: false, solution: null };
+      seen[v] = 1;
+    }
+  }
+  for (var c = 0; c < size; c++) {
+    var seen = new Uint8Array(size + 1);
+    for (var r = 0; r < size; r++) {
+      if (st[r*size+c] === 1) continue;
+      var v = grid[r*size+c];
+      if (seen[v]) return { ok: false, solution: null };
+      seen[v] = 1;
+    }
+  }
+  // Связность белых
+  if (!htConnected(st.map(function(v) { return v === 1 ? 1 : 0; }), size))
+    return { ok: false, solution: null };
+
+  // Конвертируем в boolean[][]
+  var sol = [];
+  for (var r = 0; r < size; r++) {
+    var row = [];
+    for (var c = 0; c < size; c++) row.push(st[r*size+c] === 1);
+    sol.push(row);
+  }
+  return { ok: true, solution: sol };
+}
+
+// ── Главная функция генерации ────────────────────────────────
+function htGenLevel(levelIdx, difficulty) {
+  var size = difficulty === 'easy' ? 4 : difficulty === 'hard' ? 6 : 5;
+  var targetBlack = difficulty === 'easy' ? 3 : difficulty === 'hard' ? 8 : 5;
+
+  for (var attempt = 0; attempt < 40; attempt++) {
+    var seed = levelIdx * 9973 + attempt * 1031 + 7;
+    var rng = htXr(seed);
+
+    var black = htGenMask(size, targetBlack, rng);
+    if (!black) continue;
+
+    var grid2d = htFillGrid(black, size, rng);
+    if (!grid2d) continue;
+
+    // Конвертируем плоский grid в 2d для компонента
+    var grid = [];
+    for (var r = 0; r < size; r++) {
+      var row = [];
+      for (var c = 0; c < size; c++) row.push(grid2d[r*size+c]);
+      grid.push(row);
+    }
+
+    var res = htLogicSolve(grid2d, black, size);
+    if (!res.ok) continue;
+
+    return { grid: grid, solution: res.solution, size: size };
+  }
+
+  // Запасной вариант — простой решаемый уровень 4x4
+  var fallbackGrid = [[1,2,1,3],[2,1,3,2],[3,1,2,1],[1,3,2,1]];
+  var fallbackSol  = [[false,false,true,false],[false,true,false,false],[false,true,false,false],[true,false,false,true]];
+  var sz = difficulty === 'easy' ? 4 : difficulty === 'hard' ? 6 : 5;
+  if (sz === 4) return { grid: fallbackGrid, solution: fallbackSol, size: 4 };
+  // Для 5x5 и 6x6 — пробуем ещё раз с другим сидом
+  var rng2 = htXr(levelIdx * 1234 + 999);
+  var b2 = htGenMask(sz, sz === 5 ? 4 : 7, rng2);
+  if (b2) {
+    var g2 = htFillGrid(b2, sz, rng2);
+    if (g2) {
+      var grid3 = [];
+      for (var r = 0; r < sz; r++) { var row = []; for (var c = 0; c < sz; c++) row.push(g2[r*sz+c]); grid3.push(row); }
+      var res2 = htLogicSolve(g2, b2, sz);
+      if (res2.ok) return { grid: grid3, solution: res2.solution, size: sz };
+    }
+  }
+  return { grid: fallbackGrid, solution: fallbackSol, size: 4 };
 }
 
 function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficulty = 'normal', lang = 'ru', onHint }) {
@@ -1276,6 +1557,8 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     const errs = new Set();
     const iso = new Set();
     if (cells.length !== size * size) return { errors: errs, isolated: iso, hint: '' };
+    // Не показываем ошибки пока игрок ещё ничего не зачеркнул
+    if (!cells.some(v => v === true)) return { errors: errs, isolated: iso, hint: '' };
     let hintMsg = '';
     // Проверка строк: незачёркнутые числа не должны повторяться
     for (let r = 0; r < size; r++) {
@@ -1425,32 +1708,13 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     return cur === null ? true : null;
   };
 
-  // Быстрая проверка ошибок на новом состоянии — для звука
-  const hasErrorsInState = (nextCells) => {
-    for (let r = 0; r < size; r++) {
-      const seen = new Set();
-      for (let c = 0; c < size; c++) {
-        if (nextCells[cellIdx(r, c)] === true) continue;
-        const v = GRID[r][c];
-        if (seen.has(v)) return true;
-        seen.add(v);
-      }
-    }
-    for (let c = 0; c < size; c++) {
-      const seen = new Set();
-      for (let r = 0; r < size; r++) {
-        if (nextCells[cellIdx(r, c)] === true) continue;
-        const v = GRID[r][c];
-        if (seen.has(v)) return true;
-        seen.add(v);
-      }
-    }
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        if (nextCells[cellIdx(r, c)] !== true) continue;
-        if (c < size - 1 && nextCells[cellIdx(r, c + 1)] === true) return true;
-        if (r < size - 1 && nextCells[cellIdx(r + 1, c)] === true) return true;
-      }
+  // Звук error только если зачёркнутая клетка стоит рядом с другой зачёркнутой
+  // (нарушение правила 2). Дубликаты среди белых не считаются — это нормальное
+  // состояние задачи, игрок должен их решить.
+  const hasAdjacentBlackError = (nextCells, r, c) => {
+    for (const [nr, nc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]]) {
+      if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+      if (nextCells[cellIdx(nr, nc)] === true) return true;
     }
     return false;
   };
@@ -1466,8 +1730,8 @@ function HitoriPuzzle({ onWin, paletteAccent = '#4DEEEA', levelIdx = 1, difficul
     setCells(prev => {
       const next = [...prev];
       next[cellIdx(cell.r, cell.c)] = nextVal;
-      // Если зачеркнули и это создало ошибку — error, иначе tap
-      if (nextVal === true && hasErrorsInState(next)) {
+      // Error-звук только если зачёркнутая клетка стоит рядом с другой зачёркнутой
+      if (nextVal === true && hasAdjacentBlackError(next, cell.r, cell.c)) {
         SFX && SFX.error(); VIB && VIB.error();
       } else {
         SFX && SFX.tap(); VIB && VIB.tap();

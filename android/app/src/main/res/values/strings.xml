@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mathemagicia</string>
+    <string name="title_activity_main">Mathemagicia</string>
+    <string name="package_name">com.mathemagicia.app</string>
+    <string name="custom_url_scheme">com.mathemagicia.app</string>
+</resources>

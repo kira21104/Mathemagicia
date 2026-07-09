@@ -1,4 +1,51 @@
+# ────────────── Editor / IDE
 .claude/
-GodotGame/.godot/
+.vscode/
 .idea
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.thumbnail
+
+# ────────────── Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# ────────────── Android build cache
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/captures/
+*.apk
+*.aab
+*.hprof
+
+# ────────────── Godot (archived project)
+GodotGame/.godot/
+GodotGame/.import/
+
+# ────────────── Work scratch folder
 work/
+
+# ────────────── Backup / temp / drafts
+*.tmp
+*.bak
+*.log
+*_old.*
+*-old.*
+MathGame/audio/originals/
+
+# ────────────── Screenshots & photos (dev artifacts, huge)
+photo_*.jpg
+photo_*.png
+screen/
+
+# ────────────── Test drafts
+test_*.js

@@ -45,6 +45,9 @@ const STRINGS = {
     skySubtitle: 'Коллекция созвездий',
     skyEmpty: 'Пройди первый уровень,\nчтобы открыть созвездие',
     accent: 'Акцент',
+    resetProgress: 'Сбросить прогресс',
+    resetConfirm: 'Сбросить весь прогресс? Это нельзя отменить.',
+    resetDone: 'Прогресс сброшен',
   },
   en: {
     open: 'Open',
@@ -87,6 +90,9 @@ const STRINGS = {
     skySubtitle: 'Constellation collection',
     skyEmpty: 'Complete the first level\nto unlock a constellation',
     accent: 'Accent',
+    resetProgress: 'Reset progress',
+    resetConfirm: 'Reset all progress? This cannot be undone.',
+    resetDone: 'Progress has been reset',
   },
 };
 const useT = (lang) => (k) => (STRINGS[lang] || STRINGS.ru)[k];
@@ -169,8 +175,14 @@ function Icon({ kind, size = 22, color = '#E5C158' }) {
 
 // ─────────── Icon button (HUD pill)
 function HudButton({ children, onClick, label, size = 44 }) {
+  // click → SFX обработает глобальный listener (см. ниже в этом файле)
+  // hover: только для мыши — игнорируем enter от touch
+  const handleEnter = (e) => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    SFX && SFX.buttonHover();
+  };
   return (
-    <button className="btn-reset" onClick={onClick} aria-label={label} style={{
+    <button className="btn-reset" onClick={onClick} onPointerEnter={handleEnter} aria-label={label} style={{
       width: size, height: size, borderRadius: 999,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'radial-gradient(circle at 30% 30%, rgba(229,193,88,0.18), rgba(11,16,29,0.6) 70%)',
@@ -272,10 +284,66 @@ const SFX = (() => {
   let ctx = null;
   let enabled = true;
 
+  // Кэш загруженных семплов (записи с челесты)
+  const sampleBuffers = {};
+  const samplePromises = {};
+
   const getCtx = () => {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
+  };
+
+  // Загрузить семпл асинхронно и раскодировать в AudioBuffer
+  const loadSample = (name, url) => {
+    if (samplePromises[name]) return samplePromises[name];
+    samplePromises[name] = fetch(url)
+      .then(r => r.arrayBuffer())
+      .then(buf => new Promise((resolve, reject) => {
+        getCtx().decodeAudioData(buf, resolve, reject);
+      }))
+      .then(audioBuf => { sampleBuffers[name] = audioBuf; return audioBuf; })
+      .catch(err => { console.warn('SFX sample load failed:', name, err); return null; });
+    return samplePromises[name];
+  };
+
+  // Активные "голоса" по имени семпла — чтобы новый tap глушил хвост предыдущего.
+  const activeVoices = {};
+
+  // Воспроизвести загруженный семпл. Если ещё не загружен — вернуть false.
+  // Гасит предыдущий экземпляр этого же семпла (за 30 мс), чтобы не было эха/наложения.
+  const playSample = (name, gainMul = 1) => {
+    if (!enabled) return true;
+    const buf = sampleBuffers[name];
+    if (!buf) return false;
+    const c = getCtx();
+    const now = c.currentTime;
+
+    // Плавно гасим предыдущий экземпляр этого имени (30 мс — незаметно на слух, но убирает наложение)
+    const prev = activeVoices[name];
+    if (prev && prev.gain) {
+      try {
+        prev.gain.gain.cancelScheduledValues(now);
+        prev.gain.gain.setValueAtTime(prev.gain.gain.value, now);
+        prev.gain.gain.linearRampToValueAtTime(0, now + 0.03);
+        prev.src.stop(now + 0.035);
+      } catch (e) { /* уже остановлен */ }
+    }
+
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const gain = c.createGain();
+    gain.gain.value = gainMul;
+    src.connect(gain);
+    gain.connect(c.destination);
+    src.start(0);
+    activeVoices[name] = { src, gain };
+    src.onended = () => {
+      if (activeVoices[name] && activeVoices[name].src === src) {
+        activeVoices[name] = null;
+      }
+    };
+    return true;
   };
 
   // Базовый строительный блок: один осциллятор с огибающей громкости
@@ -294,81 +362,90 @@ const SFX = (() => {
     osc.stop(startTime + duration);
   };
 
+  // Частотный свип — для "вшух" и подхватов
+  const sweep = (fStart, fEnd, type, startTime, duration, gainPeak, fadeIn = 0.01, fadeOut = 0.1) => {
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain); gain.connect(c.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(fStart, startTime);
+    osc.frequency.exponentialRampToValueAtTime(fEnd, startTime + duration);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + fadeIn);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration - fadeOut);
+    osc.start(startTime); osc.stop(startTime + duration);
+  };
+
+  // Тон с лёгким вибрато (LFO по частоте) — для "живых" магических нот
+  const toneVibrato = (freq, type, startTime, duration, gainPeak, vibRate, vibDepth, fadeIn = 0.02, fadeOut = 0.2) => {
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const lfo = c.createOscillator();
+    const lfoGain = c.createGain();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    lfo.frequency.setValueAtTime(vibRate, startTime);
+    lfoGain.gain.setValueAtTime(vibDepth, startTime);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    osc.connect(gain); gain.connect(c.destination);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + fadeIn);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration - fadeOut);
+    osc.start(startTime); osc.stop(startTime + duration);
+    lfo.start(startTime); lfo.stop(startTime + duration);
+  };
+
+  // Фильтрованный белый шум со свипом фильтра — для шорохов, "вшух", "дыхания"
+  const filteredNoise = (startTime, duration, gainPeak, fStart, fEnd, q, fadeIn = 0.02, fadeOut = 0.15) => {
+    const c = getCtx();
+    const bufSize = Math.floor(c.sampleRate * duration);
+    const buf = c.createBuffer(1, bufSize, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const filter = c.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = q;
+    filter.frequency.setValueAtTime(fStart, startTime);
+    filter.frequency.exponentialRampToValueAtTime(fEnd, startTime + duration);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + fadeIn);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration - fadeOut);
+    src.connect(filter); filter.connect(gain); gain.connect(c.destination);
+    src.start(startTime); src.stop(startTime + duration);
+  };
+
+  // Пустышка — используется для звуков, которые ещё не записаны на пианино.
+  // Пользователь видит какие события уже озвучены (играют), а какие пока молчат.
+  const silent = () => {};
+
   return {
     setEnabled(v) { enabled = v; },
+    loadSample,
 
-    // Лёгкий щелчок — тап по клетке / выбор числа
-    tap() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      tone(520, 'sine',     t,       0.10, 0.12, 0.005, 0.05);
-      tone(780, 'triangle', t,       0.06, 0.06, 0.005, 0.04);
-    },
+    // ── Записаны на пианино (челеста) ──────────────────────────────
+    tap()  { if (enabled) playSample('tap',   0.45); },
+    place(){ if (enabled) playSample('place', 0.9);  },
+    win()  { if (enabled) playSample('win',   0.9);  },
 
-    // Размещение на место / закрашивание клетки
-    place() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      tone(440, 'sine',     t,       0.14, 0.15, 0.008, 0.06);
-      tone(660, 'sine',     t + 0.05, 0.10, 0.08, 0.005, 0.05);
-    },
-
-    // Ошибка — диссонанс
-    error() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      tone(220, 'sawtooth', t,       0.18, 0.18, 0.01, 0.12);
-      tone(233, 'sawtooth', t,       0.18, 0.12, 0.01, 0.12);
-    },
-
-    // Победа — восходящая арпеджио
-    win() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      // Ре мажор: D4 F#4 A4 D5 F#5
-      const notes = [293.66, 369.99, 440.00, 587.33, 739.99];
-      notes.forEach((freq, i) => {
-        tone(freq, 'sine', t + i * 0.13, 0.55 - i * 0.04, 0.18, 0.01, 0.25);
-      });
-      // Лёгкий блеск поверх
-      tone(1174.66, 'triangle', t + 0.60, 0.4, 0.07, 0.02, 0.35);
-    },
-
-    // Строка/столбец нонограммы решена — мягкий звон
-    lineOk() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      tone(880,  'sine', t,        0.22, 0.12, 0.005, 0.18);
-      tone(1108, 'sine', t + 0.04, 0.18, 0.08, 0.005, 0.14);
-    },
-
-    // Звезда открыта (сапёр) — мягкий "пинг"
-    reveal() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      tone(660, 'sine', t, 0.12, 0.10, 0.005, 0.08);
-    },
-
-    // Взрыв (мина) — грохот
-    boom() {
-      if (!enabled) return;
-      const c = getCtx(), t = c.currentTime;
-      // Низкий удар через noise-подобный буфер
-      const bufSize = c.sampleRate * 0.4;
-      const buf = c.createBuffer(1, bufSize, c.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2);
-      const src = c.createBufferSource();
-      src.buffer = buf;
-      const gain = c.createGain();
-      gain.gain.setValueAtTime(0.55, t);
-      gain.gain.linearRampToValueAtTime(0, t + 0.4);
-      src.connect(gain);
-      gain.connect(c.destination);
-      src.start(t);
-      // Низкий тон поверх
-      tone(80, 'sine', t, 0.35, 0.4, 0.01, 0.28);
-    },
+    // ── Пока не записаны — молчат ──────────────────────────────────
+    error:         silent,
+    lineOk:        silent,
+    reveal:        silent,
+    boom:          silent,
+    transition:    silent,
+    buttonHover:   silent,
+    buttonPress:   silent,
+    hint:          silent,
+    chapterUnlock: silent,
+    starCollect:   silent,
+    dragStart:     silent,
+    dragEnd:       silent,
   };
 })();
 
@@ -381,18 +458,160 @@ const VIB = (() => {
   };
   return {
     setEnabled(v) { enabled = v; },
-    tap()    { vib(8); },
-    place()  { vib([6, 30, 10]); },
-    error()  { vib([20, 40, 20]); },
-    win()    { vib([10, 40, 15, 40, 25]); },
-    lineOk() { vib([6, 20, 12]); },
-    reveal() { vib(5); },
-    boom()   { vib([40, 30, 40]); },
+    tap()           { vib(8); },
+    place()         { vib([6, 30, 10]); },
+    error()         { vib([20, 40, 20]); },
+    win()           { vib([10, 40, 15, 40, 25]); },
+    lineOk()        { vib([6, 20, 12]); },
+    reveal()        { vib(5); },
+    boom()          { vib([40, 30, 40]); },
+    transition()    { vib(12); },
+    buttonHover()   { /* без вибрации — hover только на десктопе */ },
+    buttonPress()   { /* без вибрации — HUD/меню, по решению пользователя только игровые элементы вибрируют */ },
+    hint()          { vib([8, 60, 4]); },
+    chapterUnlock() { vib([15, 60, 10, 60, 20, 60, 30]); },
+    starCollect()   { vib([6, 30, 14]); },
+    dragStart()     { vib(4); },
+    dragEnd()       { vib([4, 20, 8]); },
+  };
+})();
+
+// ─────────── Music engine (HTMLAudioElement — простой, поддерживает loop)
+const MUSIC = (() => {
+  let el = null;
+  let enabled = true;
+  let targetVolume = 0.5;
+  let currentUrl = null;
+  let fadeTimer = null;
+  // В Capacitor WebView (Android) mediaPlaybackRequiresUserGesture=false — autoplay разрешён сразу.
+  // В обычном браузере первый play() может провалиться, тогда markInteraction сработает от клика.
+  let userInteracted = true;
+
+  const ensureEl = () => {
+    if (el) return el;
+    el = new Audio();
+    el.loop = true;
+    el.preload = 'auto';
+    el.volume = 0;
+    return el;
+  };
+
+  const clearFade = () => {
+    if (fadeTimer) { clearInterval(fadeTimer); fadeTimer = null; }
+  };
+
+  const fadeTo = (targetVol, ms, onDone) => {
+    clearFade();
+    if (!el) { onDone && onDone(); return; }
+    const startVol = el.volume;
+    const steps = Math.max(1, Math.round(ms / 40));
+    let i = 0;
+    fadeTimer = setInterval(() => {
+      i++;
+      const k = i / steps;
+      el.volume = Math.max(0, Math.min(1, startVol + (targetVol - startVol) * k));
+      if (i >= steps) {
+        clearFade();
+        onDone && onDone();
+      }
+    }, 40);
+  };
+
+  const tryPlay = () => {
+    if (!el || !enabled || !userInteracted) return;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => { /* autoplay заблокирован — сыграет после первого действия */ });
+  };
+
+  return {
+    setEnabled(v) {
+      enabled = v;
+      if (!el) return;
+      if (!v) {
+        fadeTo(0, 400, () => { el.pause(); });
+      } else if (currentUrl) {
+        tryPlay();
+        fadeTo(targetVolume, 600);
+      }
+    },
+    setVolume(v) {
+      targetVolume = Math.max(0, Math.min(1, v));
+      if (el && !fadeTimer && enabled) el.volume = targetVolume;
+    },
+    // Отметить что пользователь взаимодействовал — можно начинать autoplay
+    markInteraction() {
+      userInteracted = true;
+      if (el && enabled && currentUrl && el.paused) tryPlay();
+    },
+    // Играть трек. Идемпотентно: отменяет любой fade-out, гарантированно возобновляет.
+    play(url) {
+      ensureEl();
+      clearFade(); // отменяем возможный текущий fade-out от stop()
+      // Тот же трек — просто убедимся что он играет и вернём громкость
+      if (currentUrl === url) {
+        if (el.paused) tryPlay();
+        fadeTo(targetVolume, 600);
+        return;
+      }
+      // Смена трека
+      const start = () => {
+        currentUrl = url;
+        el.src = url;
+        el.volume = 0;
+        if (enabled) { tryPlay(); fadeTo(targetVolume, 900); }
+      };
+      if (el.src && !el.paused) {
+        fadeTo(0, 400, () => { el.pause(); start(); });
+      } else {
+        start();
+      }
+    },
+    // Мягко остановить (без сброса currentUrl — можно возобновить play с тем же url)
+    stop() {
+      if (!el) return;
+      fadeTo(0, 400, () => { if (el) el.pause(); });
+    },
   };
 })();
 
 // Восстанавливаем настройки из localStorage при загрузке
 SFX.setEnabled(localStorage.getItem('mg_sound') !== 'off');
 VIB.setEnabled(localStorage.getItem('mg_haptics') !== 'off');
+MUSIC.setEnabled(localStorage.getItem('mg_music') !== 'off');
+MUSIC.setVolume(0.7);
 
-Object.assign(window, { useT, STRINGS, GoldDust, Candle, Icon, HudButton, CornerFlourish, Astrolabe, Rune, Constellation, SFX, VIB });
+// Предзагрузка семплов челесты (запускается лениво после первого пользовательского действия)
+if (typeof document !== 'undefined' && !window.__mgSamplesQueued) {
+  window.__mgSamplesQueued = true;
+  const startLoad = () => {
+    SFX.loadSample('tap',   'audio/tap.wav');
+    SFX.loadSample('place', 'audio/place.wav');
+    SFX.loadSample('win',   'audio/win.wav');
+    document.removeEventListener('pointerdown', startLoad);
+    document.removeEventListener('click', startLoad);
+  };
+  document.addEventListener('pointerdown', startLoad, { once: true });
+  document.addEventListener('click', startLoad, { once: true });
+}
+
+// Глобальный click-listener: отмечает первое взаимодействие для запуска музыки (autoplay policy).
+// SFX.buttonPress() сейчас молчит — вернём когда будет записана челеста на клик.
+if (typeof document !== 'undefined' && !window.__mgClickSfxBound) {
+  window.__mgClickSfxBound = true;
+  document.addEventListener('click', () => { MUSIC && MUSIC.markInteraction(); }, true);
+  document.addEventListener('pointerdown', () => { MUSIC && MUSIC.markInteraction(); }, { once: true });
+}
+
+// Автопауза музыки при сворачивании приложения
+if (typeof document !== 'undefined' && !window.__mgVisibilityBound) {
+  window.__mgVisibilityBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (!MUSIC) return;
+    if (document.hidden) MUSIC.stop();
+    else if (localStorage.getItem('mg_music') !== 'off') {
+      // возобновление сработает автоматически если play() был вызван для текущего экрана
+    }
+  });
+}
+
+Object.assign(window, { useT, STRINGS, GoldDust, Candle, Icon, HudButton, CornerFlourish, Astrolabe, Rune, Constellation, SFX, VIB, MUSIC });
