@@ -205,6 +205,14 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
   // Тёмная накладка поверх всего — независима от смены экрана
   const [coverBlack, setCoverBlack] = _uS_p(false);
 
+  // Собранные звёзды — источник истины для прогресса созвездий (см.
+  // constellation-progress.js). Разовая миграция legacy mathgame_levels
+  // выполняется до первого рендера состояния, чтобы не было мигания 0/N.
+  const [collectedStars, setCollectedStars] = _uS_p(() => {
+    migrateLegacyProgressToStars();
+    return loadCollectedStars();
+  });
+
   _uE_p(() => { if (paletteAccentOverride) setPaletteAccent(paletteAccentOverride); }, [paletteAccentOverride]);
 
   // Переход между экранами: мгновенно накрываем, меняем экран, плавно открываем
@@ -218,12 +226,23 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
     }, 16);
   };
 
-  // Инкремент уровня
+  // Инкремент уровня — единственное место, где растёт chapterLevels, поэтому
+  // единственное место, откуда должна выдаваться следующая звезда.
+  // totalCompleted — общий индекс по ВСЕМ 6 главам (не 6 раздельных счётчиков):
+  // после инкремента конкретной главы пересчитываем сумму по всем главам и
+  // выдаём звезду под этим глобальным порядковым номером прохождения.
   const incrementLevel = (ci) => {
     setChapterLevels(prev => {
       const next = [...prev];
       next[ci] = (next[ci] || 0) + 1;
       try { localStorage.setItem('mathgame_levels', JSON.stringify(next)); } catch(e) {}
+
+      const totalCompleted = totalCompletedFromChapterLevels(next);
+      const starId = starForCompletionIndex(totalCompleted);
+      if (starId) {
+        setCollectedStars(prevStars => collectStar(starId, prevStars));
+      }
+
       return next;
     });
   };
@@ -256,6 +275,7 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
     body = <ChapterSelect onBack={() => setScreen('cover')}
       onPickLevel={(c, _lvl, diff) => { setChapter(c); if (diff) setDifficulty(diff); setScreen('game'); }}
       lang={lang} paletteAccent={paletteAccent} chapterLevels={chapterLevels}
+      collectedStars={collectedStars}
       initialChapterIdx={chapter} />;
   } else if (screen === 'game') {
     const lvl = chapterLevels[chapter] + 1;
@@ -272,6 +292,15 @@ function Prototype({ initialScreen = 'loading', initialChapter = 0, initialLevel
       onResetProgress={() => {
         try { localStorage.removeItem('mathgame_levels'); } catch(e) {}
         setChapterLevels([0, 0, 0, 0, 0, 0]);
+        // Явный сброс прогресса игроком — сбрасываем и звёзды, и сам факт
+        // миграции (иначе при следующем запуске звёзды тут же вернутся
+        // обратно из уже пустого mathgame_levels — это не страшно, но
+        // сбрасываем и флаг для чистоты состояния).
+        try {
+          localStorage.removeItem(COLLECTED_STARS_KEY);
+          localStorage.removeItem(MIGRATION_FLAG_KEY);
+        } catch(e) {}
+        setCollectedStars([]);
       }} />;
   }
 
