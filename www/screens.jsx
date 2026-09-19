@@ -148,7 +148,7 @@ function getPagePoints(pageIdx, chapterIdx = 0) {
 }
 
 // ─────────────────────────── CHAPTERS — book spread
-function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels = [0,0,0,0,0,0], initialChapterIdx = 0 }) {
+function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels = [0,0,0,0,0,0], collectedStars = [], initialChapterIdx = 0 }) {
   const t = useT(lang);
   const [chapterIdx, setChapterIdx] = _uS_s(initialChapterIdx);
   const [skyOpen, setSkyOpen] = _uS_s(false);
@@ -582,8 +582,7 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
       {/* Небо коллекции */}
       {skyOpen && (
         <SkyCollection
-          chapters={chapters}
-          chapterLevels={chapterLevels}
+          collectedStars={collectedStars}
           paletteAccent={paletteAccent}
           lang={lang}
           onClose={() => setSkyOpen(false)}
@@ -595,8 +594,55 @@ function ChapterSelect({ onBack, onPickLevel, lang, paletteAccent, chapterLevels
 
 // ─────────────────────────── SKY COLLECTION (карточки по главам, карусель)
 
-// Горизонтальный свайп карточек созвездий одной главы
-function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
+// Одна карточка созвездия — рисунок через ConstellationView + прогресс X/N.
+// Состояние ("не начато" / "начато" / "собрано") целиком выведено из
+// collectedStars через getConstellationProgress — ничего не хранится отдельно.
+function ConstellationCard({ constellation, stars, collectedStars, paletteAccent, lang }) {
+  const { collected, total, completed } = getConstellationProgress(constellation, collectedStars);
+  const started = collected > 0;
+  const name = lang === 'en' ? (constellation.name || constellation.nameRu) : constellation.nameRu;
+
+  return (
+    <div style={{
+      flexShrink: 0, width: 220,
+      display:'flex', flexDirection:'column', alignItems:'center',
+      background:'rgba(8,12,28,0.85)',
+      border: completed ? '1px solid rgba(255,215,0,0.55)' : '1px solid rgba(212,175,55,0.3)',
+      borderRadius:14,
+      padding:'14px 14px 12px',
+      opacity: started ? 1 : 0.7,
+    }}>
+      {/* Название над рисунком */}
+      <div style={{
+        fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
+        fontSize:14, color:'rgba(229,193,88,0.95)', textAlign:'center',
+        lineHeight:1.25, marginBottom: 4,
+      }}>{name}</div>
+      {constellation.nameLa && (
+        <div style={{
+          fontFamily:'Comfortaa, sans-serif', fontSize:9, letterSpacing:0.5,
+          color:'rgba(212,175,55,0.5)', textAlign:'center', marginBottom: 10,
+        }}>{constellation.nameLa}</div>
+      )}
+
+      <ConstellationView constellation={constellation} stars={stars} collectedStars={collectedStars}
+        size={180} padding={18} />
+
+      {/* Прогресс X/N или СОБРАНО */}
+      <div style={{
+        marginTop: 10, fontFamily:'Cinzel, serif', fontSize: completed ? 11 : 12,
+        letterSpacing: completed ? 3 : 1, color: completed ? '#FFD700' : 'rgba(212,175,55,0.7)',
+        textTransform: completed ? 'uppercase' : 'none',
+      }}>
+        {completed ? '✓ Собрано' : `${collected} / ${total}`}
+      </div>
+    </div>
+  );
+}
+
+// Горизонтальный свайп карточек — теперь по ВСЕМ 88 созвездиям сразу,
+// не сгруппированным по главам (созвездия больше не привязаны к главе).
+function ConstellationCarousel({ constellations, stars, collectedStars, paletteAccent, lang }) {
   const [idx, setIdx] = _uS_s(0);
   const total = constellations.length;
   const touchStartX = _uR_s(null);
@@ -617,12 +663,9 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
 
   const CARD_W = 220;
   const GAP = 14;
-  const SVG_SIZE = 180; // квадратная область рисунка
-  const PAD = 18; // отступ внутри viewBox чтобы ореолы не обрезались
 
   return (
     <div style={{ userSelect:'none' }}>
-      {/* Скользящая лента карточек */}
       <div style={{ overflow:'hidden', width: CARD_W, margin:'0 auto' }}
         onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div style={{
@@ -631,108 +674,62 @@ function ChapterConstCarousel({ constellations, paletteAccent, lang }) {
           transition: 'transform 0.3s ease',
           willChange: 'transform',
         }}>
-          {constellations.map(({ pts, lines, ru, en, la, starsLit }, ci) => {
-            // Вычисляем bounding box по реальным координатам точек
-            const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-            const minX = Math.min(...xs) - PAD, maxX = Math.max(...xs) + PAD;
-            const minY = Math.min(...ys) - PAD, maxY = Math.max(...ys) + PAD;
-            const vbW = maxX - minX, vbH = maxY - minY;
-            const viewBox = `${minX} ${minY} ${vbW} ${vbH}`;
-
-            return (
-            <div key={ci} style={{
-              flexShrink: 0, width: CARD_W,
-              display:'flex', flexDirection:'column', alignItems:'center',
-              background:'rgba(8,12,28,0.85)',
-              border:'1px solid rgba(212,175,55,0.3)',
-              borderRadius:14,
-              padding:'14px 14px 12px',
-            }}>
-              {/* Название над рисунком */}
-              <div style={{
-                fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-                fontSize:14, color:'rgba(229,193,88,0.95)', textAlign:'center',
-                lineHeight:1.25, marginBottom: 4,
-              }}>{lang === 'en' ? (en || ru) : ru}</div>
-              {la && (
-                <div style={{
-                  fontFamily:'Comfortaa, sans-serif', fontSize:9, letterSpacing:0.5,
-                  color:'rgba(212,175,55,0.5)', textAlign:'center', marginBottom: 10,
-                }}>{la}</div>
-              )}
-
-              {/* Рисунок созвездия — viewBox подогнан под реальные координаты */}
-              <svg viewBox={viewBox} width={SVG_SIZE} height={SVG_SIZE} style={{ overflow:'visible' }}>
-                <g stroke="rgba(212,175,55,0.55)" strokeWidth="1.4">
-                  {(lines || []).map(([a, b], li) => {
-                    const A = pts[a], B = pts[b];
-                    if (!A || !B) return null;
-                    return <line key={li} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />;
-                  })}
-                </g>
-                {pts.map((p, si) => {
-                  const lit = si < starsLit;
-                  return (
-                    <g key={si}>
-                      {lit && <circle cx={p.x} cy={p.y} r="14" fill="#E5C158" opacity="0.10" />}
-                      {lit && <circle cx={p.x} cy={p.y} r="7" fill="#E5C158" opacity="0.20" />}
-                      <circle cx={p.x} cy={p.y}
-                        r={lit ? 4.5 : 2.2}
-                        fill={lit ? '#FFF0A0' : 'rgba(212,175,55,0.2)'}
-                        style={{ filter: lit ? 'drop-shadow(0 0 6px #FFD700) drop-shadow(0 0 3px #fff)' : 'none' }}
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-            );
-          })}
+          {constellations.map(c => (
+            <ConstellationCard key={c.id} constellation={c} stars={stars} collectedStars={collectedStars}
+              paletteAccent={paletteAccent} lang={lang} />
+          ))}
         </div>
       </div>
 
-      {/* Пагинация точками под лентой */}
-      {total > 1 && (
-        <div style={{ display:'flex', justifyContent:'center', gap:5, marginTop:8 }}>
-          {Array.from({ length: total }, (_, i) => (
+      {/* Пагинация точками под лентой — при 88 созвездиях показываем только окрестность текущей */}
+      <div style={{ display:'flex', justifyContent:'center', gap:5, marginTop:8, flexWrap:'wrap', maxWidth: CARD_W + 40 }}>
+        {Array.from({ length: total }, (_, i) => {
+          const { completed } = getConstellationProgress(constellations[i], collectedStars);
+          return (
             <button key={i} className="btn-reset" onClick={() => setIdx(i)} style={{
               width: i === idx ? 14 : 6, height: 6, borderRadius: 3,
-              background: i === idx ? paletteAccent : 'rgba(212,175,55,0.25)',
+              background: i === idx ? paletteAccent : (completed ? 'rgba(255,215,0,0.6)' : 'rgba(212,175,55,0.25)'),
               transition: 'all 0.25s ease',
             }} />
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent, lang = 'ru', onClose }) {
+function SkyCollection({ collectedStars = [], paletteAccent, lang = 'ru', onClose }) {
   const t = useT(lang);
-  const LEVELS_PER_PAGE = 6;
-  const chapterRomanNums = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+  const starsData = window.STAR_DATA || {};
+  const constellationData = window.CONSTELLATION_DATA || {};
 
+  // Все 88 созвездий, в стабильном порядке по IAU-коду — независимо от
+  // прогресса игрока (не скрываем ещё не начатые).
+  const allConstellations = _uM_s(() =>
+    Object.keys(constellationData).sort().map(code => constellationData[code]),
+    []);
+
+  const collectedSet = _uM_s(() => new Set(collectedStars), [collectedStars]);
+
+  const totalStarsInGame = _uM_s(() => {
+    const ids = new Set();
+    allConstellations.forEach(c => c.stars.forEach(id => ids.add(id)));
+    return ids.size;
+  }, [allConstellations]);
+
+  const constellationsCompleted = _uM_s(() =>
+    allConstellations.filter(c => getConstellationProgress(c, collectedSet).completed).length,
+    [allConstellations, collectedSet]);
+
+  const prevCollectedCount = _uR_s(collectedStars.length);
   _uE_s(() => {
-    const hasAny = (chapterLevels || []).some(n => (n || 0) > 0);
-    if (hasAny) { SFX && SFX.starCollect(); VIB && VIB.starCollect(); }
+    if (collectedStars.length > prevCollectedCount.current) {
+      SFX && SFX.starCollect(); VIB && VIB.starCollect();
+    }
+    prevCollectedCount.current = collectedStars.length;
     // Фоновая музыка меню — играет и в звёздной коллекции
     MUSIC && MUSIC.play('audio/sound.wav');
-  }, []);
-
-  // Группируем по главам: только главы с хотя бы одним пройденным уровнем
-  const allGroups = _uM_s(() => chapters.map((chapterName, ci) => {
-    const done = chapterLevels[ci] || 0;
-    if (done === 0) return null;
-    const totalPgs = Math.ceil(done / LEVELS_PER_PAGE);
-    const constellations = Array.from({ length: totalPgs }, (_, pi) => {
-      const cdata = getConstellationData(pi, ci);
-      const starsLit = Math.min(cdata.pts.length, done - pi * LEVELS_PER_PAGE);
-      return { pts: cdata.pts, lines: cdata.lines, ru: cdata.ru, en: cdata.en, la: cdata.la, starsLit };
-    });
-    return { chapterName, ci, constellations };
-  }).filter(Boolean), [chapterLevels, chapters]);
-
-  const totalAny = allGroups.reduce((s, g) => s + g.constellations.length, 0);
+  }, [collectedStars.length]);
 
   return (
     <div style={{
@@ -757,34 +754,18 @@ function SkyCollection({ chapters, chapterLevels = [0,0,0,0,0,0], paletteAccent,
         <div style={{ fontFamily:'Cinzel, serif', fontSize:10, letterSpacing:6, color:'rgba(212,175,55,0.55)', textTransform:'uppercase' }}>{t('skyTitle')}</div>
         <div style={{ fontFamily:'Cormorant Garamond, serif', fontStyle:'italic', fontSize:20, color:'#fff3b8', marginTop:3, letterSpacing:0.5 }}>{t('skySubtitle')}</div>
         <div style={{ width:70, height:1, margin:'8px auto 0', background:'linear-gradient(90deg,transparent,#D4AF37,transparent)', opacity:0.5 }} />
+        {/* Общий прогресс коллекции — вычислен, не хранится отдельно */}
+        <div style={{ display:'flex', gap:16, justifyContent:'center', marginTop:10,
+          fontFamily:'Comfortaa, sans-serif', fontSize:11, color:'rgba(229,193,88,0.75)' }}>
+          <span>{lang === 'en' ? 'Constellations' : 'Созвездия'}: {constellationsCompleted} / {allConstellations.length}</span>
+          <span>{lang === 'en' ? 'Stars' : 'Звёзды'}: {collectedStars.length} / {totalStarsInGame}</span>
+        </div>
       </div>
 
-      {/* Список глав со своими каруселями — прокручиваемая область */}
+      {/* Все 88 созвездий — прокручиваемая область, всегда видны все */}
       <div style={{ position:'relative', zIndex:2, flex:1, width:'100%', overflowY:'auto', padding:'12px 16px 24px' }}>
-        {totalAny === 0 ? (
-          <div style={{ textAlign:'center', marginTop:80,
-            fontFamily:'Cormorant Garamond, serif', fontStyle:'italic',
-            fontSize:17, color:'rgba(229,193,88,0.35)', lineHeight:1.5 }}>
-            {t('skyEmpty').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br/>}</span>)}
-          </div>
-        ) : (
-          allGroups.map(({ chapterName, ci, constellations }) => (
-            <div key={ci} style={{ marginBottom:22 }}>
-              {/* Заголовок главы */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                <div style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,rgba(212,175,55,0.3))' }} />
-                <div style={{ fontFamily:'Cinzel, serif', fontSize:9, letterSpacing:4,
-                  color:'rgba(212,175,55,0.6)', textTransform:'uppercase', whiteSpace:'nowrap' }}>
-                  {chapterRomanNums[ci]} · {chapterName}
-                </div>
-                <div style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(212,175,55,0.3),transparent)' }} />
-              </div>
-
-              {/* Карусель карточек созвездий */}
-              <ChapterConstCarousel constellations={constellations} paletteAccent={paletteAccent} lang={lang} ci={ci} />
-            </div>
-          ))
-        )}
+        <ConstellationCarousel constellations={allConstellations} stars={starsData}
+          collectedStars={collectedSet} paletteAccent={paletteAccent} lang={lang} />
       </div>
 
       {/* Закрыть */}
